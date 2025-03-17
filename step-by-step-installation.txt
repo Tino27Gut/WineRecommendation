@@ -1,0 +1,36 @@
+PASO 1: INSTALAR GOOGLE CHROME
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+
+sudo apt update
+
+sudo dpkg -i google-chrome-stable_current_amd64.deb
+
+sudo apt-get install -f
+
+PASO 2: CHEQUEAR VERSIÓN DE GOOGLE CHROME
+google-chrome --version
+
+Google Chrome 134.0.6998.88
+
+
+PASO 3: INSTALAR CHROME DRIVER
+wget https://storage.googleapis.com/chrome-for-testing-public/134.0.6998.88/linux64/chromedriver-linux64.zip
+
+sudo apt install unzip
+
+unzip chromedriver-linux64.zip
+
+PASO 4: MOVER CHROME DRIVER A UNA CARPETA GENERAL DEL SISTEMA Y DAR PERMISOS PARA ACCEDER
+
+sudo mv chromedriver-linux64 /usr/bin/chromedriver
+
+sudo chown root:root /usr/bin/chromedriver
+
+sudo chmod +x /usr/bin/chromedriver
+
+sudo apt install chromium-chromedriver
+
+PASO 5: CREAR VIRTUAL ENVIRONMENT E INSTALAR DEPENDENCIAS
+
+python3 -m venv .venv
+source .venv/bin/activate
