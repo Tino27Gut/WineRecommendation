@@ -38,3 +38,6 @@ PASO 5: CREAR VIRTUAL ENVIRONMENT E INSTALAR DEPENDENCIAS
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r dependencies.txt
+
+GUARDAR LAS DEPENDENCIAS ACTUALES:
+pip freeze > requirements.txt
