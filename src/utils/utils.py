@@ -9,10 +9,7 @@ def save_csv(df, path, filename):
     full_path = os.path.join(path, filename)
     df.to_csv(full_path, index=False)
     print(f"Archivo guardado en: {full_path}")
-
-def load_csv(path):
-    """ Carga un CSV en un DataFrame. """
-    return pd.read_csv(path)
+    
 
 def setup_driver(headless=True):
     """ Configura el driver de selenium para WebScraping. """
