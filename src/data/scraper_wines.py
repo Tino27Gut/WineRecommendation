@@ -7,13 +7,9 @@ import time
 # Third Party Libraries
 from bs4 import BeautifulSoup
 import pandas as pd
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from webdriver_manager.chrome import ChromeDriverManager
 
 # Own Libraries
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'utils')))
@@ -44,32 +40,37 @@ def scrape_wine_data(driver, link_file_name="wine_links.csv", import_path="src/d
             country_option.click()
             first_link = False
         
-        time.sleep(6)
+        time.sleep(3)
         soup = BeautifulSoup(driver.page_source, "html.parser")
         
         try: # DATA 1: NOMBRE (name)
             wine_name_tag = soup.find("a", {"data-cartitemsource": "wine-page-master-link"})
             wine_name = wine_name_tag.get_text(strip=True)
             wine_df.at[index, "name"] = wine_name
-        except: pass
+        except Exception as e:
+            logging.error(f"Error obteniendo nombre del vino: {e}\nWine: {row["wine_link"]}")
 
         try: # DATA 2: AÑO (year)
             wine_df.at[index, "year"] = wine_name_tag.find_parent("div").get_text(strip=True).replace(wine_name, "").strip()
-        except: pass
+        except Exception as e:
+            logging.error(f"Error obteniendo año de vino: {e}\nWine: {row["wine_link"]}")
 
         try: # DATA 3: BODEGA (WINERY)
             wine_df.at[index, "winery"] = soup.find("h1").find("div").find("a").find("div").get_text(strip=True)
-        except: pass
+        except Exception as e:
+            logging.error(f"Error obteniendo bodega: {e}\nWine: {row["wine_link"]}")
 
         try: # DATA 4: REVIEWS (Rating)
             rating_tag = soup.find("a", {"href": "#all_reviews"})
             wine_df.at[index, "rating"] = rating_tag.find("div").find("div").get_text(strip=True)
             wine_df.at[index, "rating_qty"] = rating_tag.find_all("div")[-1].get_text(strip=True).split(" ")[0]
-        except: pass
+        except Exception as e:
+            logging.error(f"Error obteniendo ratings: {e}\nWine: {row["wine_link"]}")
 
         try: # DATA 5: PRICE (Precio)
             wine_df.at[index, "price"] = soup.find("span", {"class": "purchaseAvailability__currentPrice--3mO4u"}).get_text(strip=True).replace("$", "")
-        except: pass
+        except Exception as e:
+            logging.error(f"Error obteniendo precio: {e}\nWine: {row["wine_link"]}")
 
         try: # DATA 6: TASTE (Sabor)
             wine_taste = soup.find_all("tr", {"class": "tasteStructure__tasteCharacteristic--jLtsE"})
@@ -94,72 +95,55 @@ def scrape_wine_data(driver, link_file_name="wine_links.csv", import_path="src/d
             wine_df.at[index, "sweetness"] = tastes_values["sweetness"]
             wine_df.at[index, "acidity"] = tastes_values["acidity"]
         except Exception as e:
-            logging.error(f"Error buscando sabores: {e}")
+            logging.error(f"Error obteniendo sabores: {e}\nWine: {row["wine_link"]}")
 
-
-        # DATA 7 : NOTE MENTIONS (Menciones de notas)
-
-        try:
+        try: # DATA 7 : NOTE MENTIONS (Menciones de notas)
             mentions = soup.find_all("div", {"data-testid": "mentions"})
 
             mentions_dict = {}
 
-            for mention in mentions:
-                note = mention.find("span").get_text(strip=True)
-                n_mentions = mention.get_text().split(" ")[0]
-                mentions_dict[str(note)] = int(n_mentions)
-        except:
-            mentions_dict = None
+            if mentions:
+                mentions_dict = {
+                    mention.find("span").get_text(strip=True): int(mention.get_text().split(" ")[0])
+                    for mention in mentions if mention.find("span")
+                }
+
+            wine_df.at[index, "notes"] = mentions_dict
+        except Exception as e:
+            logging.error(f"Error obteniendo notas: {e}\nWine: {row["wine_link"]}")
         
-        # DATA 8 : PAIRINGS (Maridajes)
-        try:
+        try: # DATA 8 : PAIRINGS (Maridajes)
             pairing_tags = soup.find("div", {"class": "foodPairing__foodContainer--1bvxM"}).find_all("a", recursive=False)
             
-            pairing_list = []
+            if pairing_tags:
+                wine_df.at[index, "pairings"] = [
+                    pairing.find("div", {"role": "img"})["aria-label"].lower()
+                    for pairing in pairing_tags if pairing.find("div")
+                ]
+        except Exception as e:
+            logging.error(f"Error obteniendo pairings: {e}\nWine: {row["wine_link"]}")
 
-            for i in pairing_tags:
-                pairing = i.find("div", {"role": "img"})["aria-label"].lower()
-                pairing_list.append(pairing)
-        except:
-            pairing_tags = None
 
-
-        # DATA 9 : GRAPES (Uvas)
-        try:
+        try: # DATA 9 : WINE FACTS (Uvas, Región, Estilo)
             wine_facts = soup.find_all("tr", {"data-testid": "wineFactRow"})
-        except:
-            wine_facts = None
+            
+            for fact in wine_facts:
+                row_name = fact.find("div").get_text(strip=True).lower()
+                value = fact.find("td").get_text(strip=True) if fact.find("td") else None
 
-        try:
-            grapes = list(wine_facts[1].find("td").get_text(strip=True).split(","))
-        except:
-            grapes = None
+                if row_name == "grapes":
+                    wine_df.at[index, "grapes"] = value.split(",") if value else None
+                elif row_name == "region":
+                    wine_df.at[index, "region"] = value.split("/") if value else None
+                elif row_name == "wine style":
+                    wine_df.at[index, "style"] = value
+        except Exception as e:
+            logging.error(f"Error obteniendo características del vino: {e}\nWine: {row["wine_link"]}")
 
-        try:
-        # DATA 10 : REGION
-            region = list(wine_facts[2].find("td").get_text(strip=True).split("/"))
-        except:
-            region = None
-
-        try:
-            # DATA 11 : STYLE (Estilo)
-            style = wine_facts[3].find("td").get_text()
-        except:
-            style = None
-
-        try:
-            # DATA 12 : WINE IMAGE (Imagen del Vino)
-            img = "https:" + soup.find("img", {"class": "wineLabel-module__image--3HOnd"})["src"]
-        except:
-            img = None
-        
-        # ÚLTIMO PASO: GUARDAR EN DATAFRAME
-        wine_df.at[index, "notes"] = mentions_dict
-        wine_df.at[index, "pairings"] = pairing_list
-        wine_df.at[index, "grapes"] = grapes
-        wine_df.at[index, "region"] = region
-        wine_df.at[index, "style"] = style
-        wine_df.at[index, "image"] = img
+        try: # DATA 10 : WINE IMAGE (Imagen del Vino)
+            wine_df.at[index, "image"] = "https:" + soup.find("img", {"class": "wineLabel-module__image--3HOnd"})["src"]
+        except Exception as e:
+            logging.error(f"Error obteniendo imagen: {e}\nWine: {row["wine_link"]}")    
 
     driver.quit()
 
@@ -169,5 +153,5 @@ def scrape_wine_data(driver, link_file_name="wine_links.csv", import_path="src/d
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     driver = ut.setup_driver()
-    scrape_wine_data(driver, link_file_name="wine_links_copy.csv")
+    scrape_wine_data(driver, link_file_name="wine_links.csv")
 
