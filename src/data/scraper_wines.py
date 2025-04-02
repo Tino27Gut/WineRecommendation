@@ -68,7 +68,13 @@ def scrape_wine_data(driver, link_file_name="wine_links.csv", import_path="src/d
             logging.error(f"Error obteniendo ratings: {e}\nWine: {row["wine_link"]}")
 
         try: # DATA 5: PRICE (Precio)
-            wine_df.at[index, "price"] = soup.find("span", {"class": "purchaseAvailability__currentPrice--3mO4u"}).get_text(strip=True).replace("$", "")
+            price_element = (
+                soup.find("span", {"class": "purchaseAvailability__currentPrice--3mO4u"})
+                or soup.find("span", {"class": "purchaseAvailabilityPPC__amount--2_4GT"})
+            )
+            
+            if price_element:
+                wine_df.at[index, "price"] = price_element.get_text(strip=True).replace("$", "")                
         except Exception as e:
             logging.error(f"Error obteniendo precio: {e}\nWine: {row["wine_link"]}")
 
@@ -153,5 +159,5 @@ def scrape_wine_data(driver, link_file_name="wine_links.csv", import_path="src/d
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     driver = ut.setup_driver()
-    scrape_wine_data(driver, link_file_name="wine_links.csv")
+    scrape_wine_data(driver, link_file_name="null_price.csv", scraped_file_name="null_prices_fix.csv")
 
