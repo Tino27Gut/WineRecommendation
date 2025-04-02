@@ -4,8 +4,10 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-def save_csv(df, path, filename):
+def save_csv(df, path=None, filename="output.csv"):
     """ Guarda un DataFrame como CSV en la ruta especificada. """
+    if path is None:
+        path = os.getcwd()
     full_path = os.path.join(path, filename)
     df.to_csv(full_path, index=False)
     print(f"Archivo guardado en: {full_path}")
