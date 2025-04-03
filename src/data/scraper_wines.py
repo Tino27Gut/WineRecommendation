@@ -21,7 +21,7 @@ def scrape_wine_data(driver, link_file_name="wine_links.csv", import_path="src/d
     wine_df["name"] = wine_df["year"] = wine_df["winery"] = wine_df["rating"] = None
     wine_df["rating_qty"] = wine_df["price"] = wine_df["body"] = wine_df["tannis"] = None
     wine_df["sweetness"] = wine_df["acidity"] = wine_df["notes"] = wine_df["pairings"] = None
-    wine_df["grapes"] = wine_df["region"] = wine_df["style"] = wine_df["image"] = None
+    wine_df["grapes"] = wine_df["region"] = wine_df["style"] = wine_df["alcohol"] = wine_df["image"] = None
 
     first_link = True
 
@@ -130,7 +130,7 @@ def scrape_wine_data(driver, link_file_name="wine_links.csv", import_path="src/d
             logging.error(f"Error obteniendo pairings: {e}\nWine: {row["wine_link"]}")
 
 
-        try: # DATA 9 : WINE FACTS (Uvas, Región, Estilo)
+        try: # DATA 9 : WINE FACTS (Uvas, Región, Estilo, Alcohol)
             wine_facts = soup.find_all("tr", {"data-testid": "wineFactRow"})
             
             for fact in wine_facts:
@@ -143,6 +143,8 @@ def scrape_wine_data(driver, link_file_name="wine_links.csv", import_path="src/d
                     wine_df.at[index, "region"] = value.split("/") if value else None
                 elif row_name == "wine style":
                     wine_df.at[index, "style"] = value
+                elif row_name == "alcohol content":
+                    wine_df.at[index, "alcohol"] = value
         except Exception as e:
             logging.error(f"Error obteniendo características del vino: {e}\nWine: {row["wine_link"]}")
 
