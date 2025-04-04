@@ -32,7 +32,7 @@ def scrape_wine_data(driver, link_file_name="wine_links.csv", import_path="src/d
             if first_link:
                 # Step 1: click country dropdown
                 time.sleep(2)
-                wait = WebDriverWait(driver, 30)
+                wait = WebDriverWait(driver, 300)
                 dropdown = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "simpleLabel-module__selectedKey--3ngzL")))
                 dropdown.click()
                 time.sleep(2)
@@ -165,9 +165,9 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     driver = ut.setup_driver()
     start_time = time.time()
-    scrape_wine_data(driver, link_file_name="links2.1.csv", scraped_file_name="wines2.1.csv")
+    scrape_wine_data(driver, link_file_name="links3.csv", scraped_file_name="wines3.csv")
     end_time = time.time()
     elapsed_time = round((end_time - start_time)/60, 2)
-    wines_scraped = pd.read_csv("src/data/raw/scraped_wines/wines2.1.csv").shape[0]
+    wines_scraped = pd.read_csv("src/data/raw/scraped_wines/wines3.csv").shape[0]
     logging.info(f"Se scrapearon un total de {wines_scraped} vinos en {elapsed_time} minutos.")
 
