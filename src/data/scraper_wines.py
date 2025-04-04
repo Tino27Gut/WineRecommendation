@@ -165,9 +165,9 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     driver = ut.setup_driver()
     start_time = time.time()
-    scrape_wine_data(driver, link_file_name="links3.csv", scraped_file_name="wines3.csv")
+    scrape_wine_data(driver, link_file_name="wines_left.csv", scraped_file_name="wines5.csv")
     end_time = time.time()
     elapsed_time = round((end_time - start_time)/60, 2)
-    wines_scraped = pd.read_csv("src/data/raw/scraped_wines/wines3.csv").shape[0]
+    wines_scraped = pd.read_csv("src/data/raw/scraped_wines/wines5.csv").shape[0]
     logging.info(f"Se scrapearon un total de {wines_scraped} vinos en {elapsed_time} minutos.")
 
