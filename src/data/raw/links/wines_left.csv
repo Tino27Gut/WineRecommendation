@@ -1,0 +1,13 @@
+wine_link,name,year,winery,rating,rating_qty,price,body,tannis,sweetness,acidity,notes,pairings,grapes,region,style,alcohol,image
+https://www.vivino.com/cl-geisse-rose-brut/w/1220057?price_id=33243294,,,Cave Amadeu,3.8,5633,26.24, 39.776%,,, 54.945%,"{'red fruit': 56, 'tree fruit': 19, 'citrus': 16, 'yeasty': 8, 'earthy': 5, 'tropical': 2, 'ageing': 2, 'spices': 1, 'floral': 1}","['pork', 'shellfish', 'rich fish (salmon, tuna etc)']",['Pinot Noir'],"['Brazil', 'Rio Grande do Sul', 'Serra Gaúcha']",Brazilian Sparkling,12.5%,https://images.vivino.com/thumbs/2eG1E4YvQD2lD1D5Crf7_g_pb_x600.png
+https://www.vivino.com/zuccardi-malamado-malbec-port/w/19488?price_id=35459693,,,Zuccardi,3.8,5419,25.95,,,,,"{'oaky': 146, 'black fruit': 110, 'dried fruit': 95, 'red fruit': 38, 'ageing': 35, 'spices': 30, 'earthy': 23, 'yeasty': 18, 'citrus': 7, 'floral': 2, 'vegetal': 1, 'tree fruit': 1, 'tropical': 1}",,['Malbec'],"['Argentina', 'Mendoza']",,13%,https://images.vivino.com/thumbs/jF7MMUTqSfGFM4Jv-SZVkA_pb_x600.png
+https://www.vivino.com/zorzal-gran-terroir-pinot-noir/w/1451764?year=2019&price_id=27155296,,,,,,,,,,,,,,,,,
+https://www.vivino.com/bodegas-bianchi-iv-generacion-single-block-gran-malbec/w/8859264?year=2019&price_id=35432108,,,,,,,,,,,,,,,,,
+https://www.vivino.com/alta-vista-single-vineyard-alizarine-malbec/w/1258383?year=2015&price_id=36624215,,,,,,,,,,,,,,,,,
+https://www.vivino.com/vina-cobos-cocodrilo-red-blend-mendoza/w/2178564?year=2021&price_id=35095071,,,,,,,,,,,,,,,,,
+https://www.vivino.com/alpasion-grand-petit-verdot-valle-de-uco/w/5891579?year=2018&price_id=33208648,,,,,,,,,,,,,,,,,
+https://www.vivino.com/falasco-wines-hermandad-red-blend/w/5404799?year=2018&price_id=24954215,,,,,,,,,,,,,,,,,
+https://www.vivino.com/el-enemigo-chardonnay/w/1272950?year=2021&price_id=36869189,,,,,,,,,,,,,,,,,
+https://www.vivino.com/luca-chardonnay-g-lot/w/74336?year=2020&price_id=31923436,,,,,,,,,,,,,,,,,
+https://www.vivino.com/tikal-amorio-malbec/w/81980?year=2015&price_id=35395987,,,,,,,,,,,,,,,,,
+https://www.vivino.com/zuccardi-cuvee-especial-blanc-de-blancs/w/1225687?price_id=29840877,,,Zuccardi,3.9,1112,36.74, 29.1128%,,, 72.6141%,"{'tree fruit': 37, 'citrus': 22, 'yeasty': 16, 'ageing': 16, 'earthy': 12, 'oaky': 11, 'tropical': 3, 'vegetal': 2, 'spices': 1}","['shellfish', 'any junk food will do', 'appetizers and snacks', 'lean fish', 'aperitif']",['Chardonnay'],"['Argentina', 'Mendoza']",Argentinian Mendoza Sparkling,12%,https://images.vivino.com/thumbs/6qXEWMvzS9W5E7xu_0Orzg_pb_x600.png
