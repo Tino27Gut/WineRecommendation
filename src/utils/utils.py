@@ -22,3 +22,22 @@ def setup_driver(headless=True):
     driver.set_page_load_timeout(300)
     return driver
 
+
+def manage_outlier_IQR(df, i=1.5, func="find"):
+    """
+    Devuelve un DataFrame con o sin outliers en base el parametro 'func'.\n
+    source: #https://careerfoundry.com/en/blog/data-analytics/how-to-find-outliers/\n
+    df = DataFrame\n
+    i = Indice que multiplica IQR (default = 1.5)
+    func = 'find' para obtener solo outliers, 'remove' para quitarlos (default = 'find')
+    """
+    q1 = df.quantile(0.25)
+    q3 = df.quantile(0.75)
+    iqr = q3-q1
+    if func == "find":
+        outliers = (df < (q1 - i * iqr)) | (df > (q3 + i * iqr))
+    elif func == "remove":
+        outliers = (df >= (q1 - i * iqr)) & (df <= (q3 + i * iqr))
+    else:
+        raise AttributeError("Please select 'find' or 'remove' funcions!")
+    return df[outliers]
