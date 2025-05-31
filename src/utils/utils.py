@@ -1,8 +1,15 @@
 import pandas as pd
 import os
+
+# Scrapper
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+
+# Machine Learning
+from sklearn.metrics import silhouette_score
+from sklearn.metrics import davies_bouldin_score
+from sklearn.metrics import calinski_harabasz_score
 
 def save_csv(df, path=None, filename="output.csv"):
     """ Guarda un DataFrame como CSV en la ruta especificada. """
@@ -41,3 +48,23 @@ def manage_outlier_IQR(df, i=1.5, func="find"):
     else:
         raise AttributeError("Please select 'find' or 'remove' funcions!")
     return df[outliers]
+
+
+
+def eval_cluster(X, labels):
+    """
+    Calcula métricas de performance de clusters.
+
+    Atributos:
+    - X: Matriz de variables utilizadas para clusterizar.
+    - labels: Array de clusters calculado a partir de X.
+
+    Return:
+    - Devuelve un diccionario con las métricas "Silhouette", "DB Score" y "CH Score".
+    """
+
+    return {
+        "Silhouette": silhouette_score(X, labels),
+        "DB Score": davies_bouldin_score(X, labels),
+        "CH Score": calinski_harabasz_score(X, labels),
+    }
