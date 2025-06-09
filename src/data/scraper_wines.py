@@ -19,7 +19,7 @@ import utils as ut
 def scrape_wine_data(driver, link_file_name="wine_links.csv", import_path="src/data/raw/links/", scraped_file_name="wines.csv", save_path="src/data/raw/scraped_wines/"):
     wine_df = pd.read_csv(import_path + link_file_name).drop_duplicates()
     wine_df["name"] = wine_df["year"] = wine_df["winery"] = wine_df["rating"] = None
-    wine_df["rating_qty"] = wine_df["price"] = wine_df["body"] = wine_df["tannis"] = None
+    wine_df["rating_qty"] = wine_df["price"] = wine_df["body"] = wine_df["tannins"] = None
     wine_df["sweetness"] = wine_df["acidity"] = wine_df["notes"] = wine_df["pairings"] = None
     wine_df["grapes"] = wine_df["region"] = wine_df["style"] = wine_df["alcohol"] = wine_df["image"] = None
 
@@ -81,7 +81,7 @@ def scrape_wine_data(driver, link_file_name="wine_links.csv", import_path="src/d
 
             try: # DATA 6: TASTE (Sabor)
                 wine_taste = soup.find_all("tr", {"class": "tasteStructure__tasteCharacteristic--jLtsE"})
-                tastes_values = {"body": None, "tannis": None, "sweetness": None, "acidity": None}
+                tastes_values = {"body": None, "tannins": None, "sweetness": None, "acidity": None}
 
                 for taste in wine_taste:
                     name = taste.find("td").get_text(strip=True)
@@ -91,14 +91,14 @@ def scrape_wine_data(driver, link_file_name="wine_links.csv", import_path="src/d
                     if name == "Light":
                         tastes_values["body"] = val
                     elif name == "Smooth":
-                        tastes_values["tannis"] = val
+                        tastes_values["tannins"] = val
                     elif name == "Dry":
                         tastes_values["sweetness"] = val
                     elif name == "Soft":
                         tastes_values["acidity"] = val
 
                 wine_df.at[index, "body"] = tastes_values["body"]
-                wine_df.at[index, "tannis"] = tastes_values["tannis"]
+                wine_df.at[index, "tannins"] = tastes_values["tannins"]
                 wine_df.at[index, "sweetness"] = tastes_values["sweetness"]
                 wine_df.at[index, "acidity"] = tastes_values["acidity"]
             except Exception as e:
