@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+from typing import List, Dict, Tuple, Union
 
 # Scrapper
 from selenium import webdriver
@@ -30,24 +31,29 @@ def setup_driver(headless=True):
     return driver
 
 
-def manage_outlier_IQR(df, i=1.5, func="find"):
+def manage_outlier_IQR(data: Union[pd.DataFrame, pd.Series], i: float=1.5, func: str="find") -> Union[pd.DataFrame, pd.Series]:
     """
     Devuelve un DataFrame con o sin outliers en base el parametro 'func'.\n
     source: #https://careerfoundry.com/en/blog/data-analytics/how-to-find-outliers/\n
-    df = DataFrame\n
-    i = Indice que multiplica IQR (default = 1.5)
-    func = 'find' para obtener solo outliers, 'remove' para quitarlos (default = 'find')
+
+    Args:
+        - df = DataFrame\n
+        - i = Indice que multiplica IQR (default = 1.5)
+        - func = 'find' para obtener solo outliers, 'remove' para quitarlos (default = 'find')
+
+    Returns:
+        - DataFrame o Serie con o sin outliers (según func).
     """
-    q1 = df.quantile(0.25)
-    q3 = df.quantile(0.75)
+    q1 = data.quantile(0.25)
+    q3 = data.quantile(0.75)
     iqr = q3-q1
     if func == "find":
-        outliers = (df < (q1 - i * iqr)) | (df > (q3 + i * iqr))
+        outliers = (data < (q1 - i * iqr)) | (data > (q3 + i * iqr))
     elif func == "remove":
-        outliers = (df >= (q1 - i * iqr)) & (df <= (q3 + i * iqr))
+        outliers = (data >= (q1 - i * iqr)) & (data <= (q3 + i * iqr))
     else:
         raise AttributeError("Please select 'find' or 'remove' funcions!")
-    return df[outliers]
+    return data[outliers]
 
 
 
