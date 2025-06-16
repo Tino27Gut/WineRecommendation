@@ -1,6 +1,7 @@
-import pandas as pd
 import os
 from typing import List, Dict, Tuple, Union
+from pathlib import Path
+import pandas as pd
 
 # Scrapper
 from selenium import webdriver
@@ -74,3 +75,61 @@ def eval_cluster(X, labels):
         "DB Score": davies_bouldin_score(X, labels),
         "CH Score": calinski_harabasz_score(X, labels),
     }
+
+
+def get_project_root() -> Path:
+    """
+    Encuentra la raíz del proyecto usando múltiples estrategias.
+
+    Returns:
+        - Devuelve el directorio raíz del proyecto
+    """
+    current = Path(__file__).resolve().parent
+    
+    # Estrategia 1: Buscar marcadores de proyecto
+    root_markers = ["pyproject.toml", ".gitignore"]
+    
+    # Estrategia 2: Buscar estructura específica del proyecto
+    def has_project_structure(path):
+        return (
+            (path / "src").is_dir() and
+            (path / "src" / "data").is_dir() and
+            (path / "src" / "models").is_dir() and
+            (path / "src" / "utils").is_dir()
+        )
+    
+    # Buscar hacia arriba
+    while current != current.parent:
+        
+        # Estrategia 1: Archivos marcadores
+        for marker in root_markers:
+            if (current / marker).exists():
+                return current
+        
+        # Estrategia 2: Estructura del proyecto
+        if has_project_structure(current):
+            return current
+            
+        current = current.parent
+    
+    raise Exception(
+        "No se encontró la raíz del proyecto. Opciones:\n"
+        "1. Crear archivos pyproject.toml y .gitignore en la root del proyecto (directorio principal)\n"
+        "2. Asegurar estructura src/data/, src/models/ y src/utils/"
+    )
+
+def get_project_file_path(*path_parts):
+    """
+    Construye rutas relativas al proyecto.
+    
+    Args:
+        - *path_parts -> Partes de la ruta como argumentos separados
+        
+    Returns:
+        - Path -> Ruta completa al archivo/directorio
+        
+    Ejemplo:
+        get_project_path("src", "data", "transformed", "wines.csv")
+    """
+    return get_project_root().joinpath(*path_parts)
+

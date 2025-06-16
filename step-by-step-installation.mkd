@@ -1,0 +1,160 @@
+# 🍷 Wine Recommender - Guía de Instalación Completa
+
+## PASO 1: INSTALAR GOOGLE CHROME EN UBUNTU
+
+```bash
+# Descargar Chrome
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+
+# Actualizar repositorios
+sudo apt update
+
+# Instalar Chrome
+sudo dpkg -i google-chrome-stable_current_amd64.deb
+
+# Resolver dependencias si es necesario
+sudo apt-get install -f
+```
+
+---
+
+## PASO 2: VERIFICAR VERSIÓN DE GOOGLE CHROME
+
+```bash
+google-chrome --version
+```
+
+**Output tipo esperado:**
+```
+Google Chrome 134.0.6998.88
+```
+
+---
+
+## PASO 3: INSTALAR CHROME DRIVER EN UBUNTU
+
+```bash
+# Descargar ChromeDriver (versión específica para tu Chrome)
+wget https://storage.googleapis.com/chrome-for-testing-public/134.0.6998.88/linux64/chromedriver-linux64.zip
+
+# Instalar unzip si no lo tienes
+sudo apt install unzip
+
+# Descomprimir ChromeDriver
+unzip chromedriver-linux64.zip
+```
+
+---
+
+## PASO 4: CONFIGURAR CHROME DRIVER EN EL SISTEMA
+
+```bash
+# Mover ChromeDriver al directorio del sistema
+sudo mv chromedriver-linux64 /usr/bin/chromedriver
+
+# Establecer permisos correctos
+sudo chown root:root /usr/bin/chromedriver
+sudo chmod +x /usr/bin/chromedriver
+
+# Instalar chromium-chromedriver adicional
+sudo apt install chromium-chromedriver
+```
+
+---
+
+## PASO 5: CREAR VIRTUAL ENVIRONMENT
+
+```bash
+# Crear virtual environment
+python3 -m venv .venv
+
+# Activar (Linux/Mac)
+source .venv/bin/activate
+
+# Activar (Windows)
+.venv\Scripts\activate
+```
+
+---
+
+## PASO 6: INSTALAR PROYECTO Y DEPENDENCIAS
+
+### 1. Posicionarse en el directorio raíz del proyecto
+
+### 2. Instalar todo de una vez
+```bash
+pip install -e .
+```
+
+### ¿Qué hace `pip install -e .`?
+
+1. ✅ **Instala todas las dependencias** (pandas, numpy, scikit-learn, selenium, etc.)
+2. ✅ **Hace tu código importable** desde cualquier lugar
+3. ✅ **Modo "editable"** - los cambios se reflejan inmediatamente
+
+### Ejemplo de uso:
+```python
+from src.wine_recommender.utils import mi_funcion
+from src.wine_recommender.models import mi_modelo
+```
+
+---
+
+## 🔧 GESTIÓN DE DEPENDENCIAS
+
+### Si necesitas agregar una librería:
+
+1. **Agrégala al `pyproject.toml`** en la lista `dependencies`
+2. **Ejecuta** `pip install -e .` otra vez
+
+### Ejemplo:
+```toml
+dependencies = [
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "selenium",
+    "nueva-libreria"  # ← Agregar aquí
+]
+```
+
+---
+
+## 📝 NOTAS IMPORTANTES
+
+- ⚠️ **El archivo `.egg-info/` se crea automáticamente** (no lo toques)
+- 📁 **Agrega `.venv/` y `*.egg-info/` a tu `.gitignore`**
+- 🔄 **Siempre trabaja con el virtual environment activado**
+
+---
+
+## 🚀 VERIFICAR INSTALACIÓN
+
+```bash
+# Probar que todo funciona
+python -c "from src.wine_recommender import utils; print('✅ Instalación exitosa')"
+
+# Verificar Selenium con Chrome
+python -c "from selenium import webdriver; driver = webdriver.Chrome(); print('✅ Selenium funcionando'); driver.quit()"
+```
+
+---
+
+## 🐛 TROUBLESHOOTING
+
+### Si ChromeDriver no funciona:
+```bash
+# Verificar versión de Chrome
+google-chrome --version
+
+# Verificar ChromeDriver
+chromedriver --version
+
+# Las versiones deben coincidir
+```
+
+### Si tienes problemas con imports:
+```bash
+# Reinstalar en modo desarrollo
+pip install -e . --force-reinstall
+```

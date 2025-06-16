@@ -3,3 +3,7 @@
 
 # Ignorar configuración de VSCode
 .vscode/
+
+# Ignorar carpeta de proyecto py
+# (se instala automáticamente - ver step-by-step-installation.mkd)
+*.egg-info/
