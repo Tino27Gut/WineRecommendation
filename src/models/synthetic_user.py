@@ -1,6 +1,4 @@
 import random
-#import sys
-#import os
 import logging
 from typing import Dict, Tuple, List, Union
 
@@ -9,8 +7,19 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import RobustScaler
 
-#sys.path.append(os.path.abspath(os.path.join('..', '..', 'src', 'utils')))
 import src.utils.utils as ut
+
+default_grapes = pd.read_csv(ut.get_project_file_path("src", "data", "processed", "aux", "grapes.csv"))        # DataFrame de uvas
+default_grapes = list(default_grapes["grapes"])    
+default_pairings = pd.read_csv(ut.get_project_file_path("src", "data", "processed", "aux", "pairings.csv"))    # DataFrames de pairings
+default_pairings = list(default_pairings["pairings"])
+default_weights = {
+    "rating": .25,
+    "price_quality": .25,
+    "rating_qty": .1,
+    "user_similarity": .3,
+    "main_pairing": .1
+}
 
 class SyntheticUserSimulator:
     """
@@ -21,14 +30,18 @@ class SyntheticUserSimulator:
     """
 
     def __init__(self, wine_df: pd.DataFrame, meals_df: pd.DataFrame,
-                 pairing_cols: List[str], taste_cols: List[str], grape_cols: List[str],
-                 weights: Dict[str, float], top_n: int = 20):
+                 grape_cols: List[str]=default_grapes,
+                 pairing_cols: List[str]=default_pairings,
+                 taste_cols: List[str]=["body", "tannins", "sweetness", "acidity"],
+                 weights: Dict[str, float]=default_weights,
+                 top_n: int = 20):
         """
         Constructor: inicializa la clase con los datos base.
 
         Args:
             - wine_df -> DataFrame de vinos.
             - meals_df -> DataFrame de recetas/platos.
+            - grape_cols -> Lista con nombre de las columnas a utilizar como uvas.
             - pairing_cols -> Lista con nombre de las columnas a utilizar como pairing.
             - taste_cols -> Lista con nombre de las columnas a utilizar como taste.
             - weights -> Diccionario con pesos para cada componente del score (rating, price_quality, rating_qty, user_similarity, main_pairing).
@@ -52,7 +65,7 @@ class SyntheticUserSimulator:
 
     def generate_user_input(self) -> Dict:
         """
-        Genera un input sintético de usuario (gustos, pairing, uvas, etc.)
+        Genera un input sintético de usuario (gustos, pairing, uvas, etc.).
 
         Returns:
             - Diccionario con los parámetros preferidos por el usuario.
@@ -347,13 +360,14 @@ class SyntheticUserSimulator:
         tra_df[taste_cols_scld] = self.mm_scaler.fit_transform(tra_df[self.taste_cols])
         return tra_df, taste_cols_scld
 
-    def _df_group_other_grapes(self, df: pd.DataFrame, top_n_grapes: int = 8) -> pd.DataFrame:
+    def _df_group_other_grapes(self, df: pd.DataFrame, top_n_grapes: int = 8, drop: bool = True) -> pd.DataFrame:
         """
         Agrega agrupa todas las uvas que no son 'top wines' en la columna 'Otras Uvas'.
         
         Args:
             - df -> el DataFrame con las columnas de uvas a agrupar.
             - top_n_grapes -> número de uvas más frecuentes no agrupadas en 'Otras Uvas'.
+            - drop -> determina si dropea las columnas agrupadas en 'Otras Uvas' (default True).
 
         Returns:
             - Dataframe con uvas fuera del top_n_wines agrupadas en la columna 'Otras Uvas'.
@@ -363,7 +377,8 @@ class SyntheticUserSimulator:
         top_grapes = list(self._get_top_grapes(grapes_df, top_n_grapes).index)
         other_grapes = [grape for grape in self.grape_cols if grape not in top_grapes]
         tra_df["Otras Uvas"] = tra_df[other_grapes].max(axis=1)
-        tra_df = tra_df.drop(columns=other_grapes)
+        if drop:
+            tra_df = tra_df.drop(columns=other_grapes)
         return tra_df
 
     
