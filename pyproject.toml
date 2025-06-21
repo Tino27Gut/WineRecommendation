@@ -19,7 +19,8 @@ dependencies = [
     "webdriver-manager",
     "openpyxl",
     "fastparquet",
-    "python-dotenv"
+    "python-dotenv",
+    "imblearn"
 ]
 
 [tool.setuptools.packages.find]
