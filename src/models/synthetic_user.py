@@ -479,6 +479,7 @@ class SyntheticUserSimulator:
         # Calcula la similitud con los gustos del usuario con Fuzzy Distance
         distances = self._compute_fuzzy_distance(tra_df[self.taste_cols_scld], tastes)
         tra_df["user_similarity"] = 1 - (distances / distances.max())
+        tra_df["taste_distance_raw"] = distances
         return tra_df
         
 
@@ -585,7 +586,8 @@ class SyntheticUserSimulator:
             # Quality/price local
             wine_base = self._df_add_qual_price(wine_base)
 
-            # User similarity (Fuzzy Distance)
+            # TODO: Quitar redundancia de cálculo de similaridad y wine_score
+            # User similarity (Fuzzy Distance) local
             wine_base = self._df_add_user_similarity(wine_base, user_tastes)
 
             # Puntaje sintético local del vino
@@ -641,6 +643,7 @@ class SyntheticUserSimulator:
                 'quality_price',
                 'quality_price_rscld',
                 'user_similarity',
+                'taste_distance_raw',
                 'wine_score',
                 'wine_score_scld'
             ]

@@ -1,12 +1,12 @@
 from pathlib import Path
 import pandas as pd
 
-from src.models.synthetic_user import SyntheticUserSimulator
+from models.synthetic_user import SyntheticUserSimulator
 from src.utils.utils import get_project_file_path
 
 # Cantidad de simulaciones a generar
-simulation_name = "simulation_01"
-n_simulations = 1000
+simulation_name = "simulation_03"
+n_simulations = 3000
 saving_path = get_project_file_path("src", "data", "synthetic", f"{simulation_name}_n{n_simulations}.pkl")
 
 # Class Main Inputs
