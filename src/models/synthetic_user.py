@@ -701,12 +701,13 @@ class SyntheticUserSimulator:
 
         return liked, prob_like
 
-    def generate_synthetic_data(self, n_users: int) -> pd.DataFrame:
+    def generate_synthetic_data(self, n_users: int, verbose: bool = True) -> pd.DataFrame:
         """
         Genera datos sintéticos para n usuarios.
 
         Parameters:
             - n_users -> Cantidad de usuarios sintéticos a simular.
+            - verbose -> Mostrar progreso de simulación.
 
         Returns:
             - DataFrame con columnas
@@ -724,6 +725,7 @@ class SyntheticUserSimulator:
             tra_df = self._df_add_qual_price(tra_df)
             tra_df = self._score_wines(tra_df, user_input)
             user_choice_pack = self.simulate_user_choice(tra_df, user_input)
+            # TODO: incluir lógica de simulación de active days
 
             if user_choice_pack is None:
                 synthetic_data.append({
@@ -749,18 +751,21 @@ class SyntheticUserSimulator:
                     "prob_like": prob_like
                 })
             
-            # Barra de progreso que se actualiza en la misma línea
-            completed = i + 1
-            percentage = (completed / n_users) * 100
-            bar_length = 30
-            filled_length = int(bar_length * completed / n_users)
+            if verbose:
+                # Barra de progreso que se actualiza en la misma línea
+                completed = i + 1
+                percentage = (completed / n_users) * 100
+                bar_length = 30
+                filled_length = int(bar_length * completed / n_users)
 
-            bar = '█' * filled_length + '░' * (bar_length - filled_length)
-            
-            # \r vuelve al inicio de la línea, end='' evita nueva línea
-            print(f'\rSimulaciones Completadas: {completed}/{n_users} ({percentage:.1f}%) [{bar}]', 
-                end='', flush=True)
+                bar = '█' * filled_length + '░' * (bar_length - filled_length)
+                
+                # \r vuelve al inicio de la línea, end='' evita nueva línea
+                print(f'\rSimulaciones Completadas: {completed}/{n_users} ({percentage:.1f}%) [{bar}]', 
+                    end='', flush=True)
+                
+        if verbose: 
+            print("\n✅ Simulación Terminada con Éxito!")
 
-        print("\n✅ Simulación Terminada con Éxito!")
         return pd.DataFrame(synthetic_data)
 
