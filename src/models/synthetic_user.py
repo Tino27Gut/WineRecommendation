@@ -1,6 +1,7 @@
 import random
 import logging
 from typing import Dict, Tuple, List, Union
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -702,30 +703,67 @@ class SyntheticUserSimulator:
         return liked, prob_like
 
 
-    def simulate_user_behaviour(self, user_id: int) -> Dict[str, Union[int, None, Dict, float]]:
+    def simulate_user_behaviour(
+            self,
+            user_id: int,
+            first_start_date: datetime=datetime(2022,1,1),
+            first_end_date: datetime=datetime(2024,1,1),
+            last_timestamp: datetime=None,
+            avg_days_between_purchases: int=30,
+            std_days_between_purchases: int=5
+        ) -> Dict[str, Union[int, None, Dict, float]]:
         """
         Simula el comportamiento completo de un usuario individual.
+            - Momento de la compra.
             - Evaluación de vinos.
             - Elección de vino.
             - Opinión del vino (like = 1 | 0).
-            - Recompra o churn de la app.
 
         Args:
             - user_id -> id del usuario a simular.
+            - first_start_date -> fecha mínima para seteo de fecha de primera interacción.
+            - first_end_date -> fecha máxima para seteo de fecha de primera interacción.
+            - last_timestamp -> fecha de interacción anterior del usuario.
+            - avg_days_between_purchases -> días promedio entre compra y compra de cada usuario.
+                - Selección final según distribución normal truncada -> (mínimo  = 1 & máximo = datetime.now()).
+            - std_days_between_purchases -> desvío estandar de días de avg_days_between_purchases.
 
         Returns:
-            - Diccionario con datos del usuario, su evaluación, elección y opinión.
+            - Diccionario con:
+                - event_timestamp -> momento de la interacción.
+                - user_id -> id del usuario.
+                - wine_id -> id del vino elegido.
+                - user_input -> diccionario con preferencias del usuario.
+                - metrics_local -> diccionario con métricas de evaluación según filtros del usuario.
+                - metrics_global -> diccionario con métricas de evaluación de todos los vinos.
+                - liked -> si al usuario le gustó o no el vino (1 | 0).
+                - prob_like -> probabilidad de que al usuario le guste el vino.
         """
         user_data = None
-
+        
+        # Simulación de comportamiento de usuario
         user_input = self.generate_user_input()
         tra_df = self.tra_df
         tra_df = self._df_add_qual_price(tra_df)
         tra_df = self._score_wines(tra_df, user_input)
         user_choice_pack = self.simulate_user_choice(tra_df, user_input)
 
+        # Asignación de timestamp
+        # https://docs.python.org/3/library/datetime.html#timedelta-objects
+        if last_timestamp is None: 
+        # Fecha de primera interacción
+            days_range = (first_end_date - first_start_date).days
+            timestamp = first_start_date + timedelta(days=np.random.randint(0, days_range))
+        else:
+        # Fecha de siguiente interacción
+            days_until_next_purchase = int(
+                np.clip(np.random.normal(avg_days_between_purchases, std_days_between_purchases), 1, datetime.now())
+            )
+            timestamp = last_timestamp + timedelta(days=days_until_next_purchase)
+
         if user_choice_pack is None:
             user_data = {
+                "event_timestamp": timestamp,
                 "user_id": user_id,
                 "wine_id": None,
                 "user_input": user_input,
@@ -739,6 +777,7 @@ class SyntheticUserSimulator:
             tra_df = user_choice_pack["global_wine_base"]
             liked, prob_like = self.simulate_like(tra_df, selected_wine)
             user_data = {
+                "event_timestamp": timestamp,
                 "user_id": user_id,
                 "wine_id": int(selected_wine.name),
                 "user_input": user_input,
@@ -753,41 +792,72 @@ class SyntheticUserSimulator:
 
     def simulate_user_repurchases(
             self,
-            user_id: int,
             user_first_pick_data: Dict,
+            avg_days_between_purchases: int=30,
+            std_days_between_purchases: int=5,
             liked_churn_rate: float=.05,
-            disliked_churn_rate: float=.4
+            disliked_churn_rate: float=.4,
+            max_repurchases: int=20
         ) -> int:
         """
         Simula las recompras de un usuario mientras está activo en la app.
             - Tomar assumption de cada cuanto un usuario realiza sus compras en promedio.
 
         Args:
-            - user_id -> Usuario al cual realizar la simulación de recompras.
-            - initial_liked -> La primera opinión del usuario (like = 1 | 0).
+            - user_first_pick_data -> DataFrame con la primera selección del usuario.
+            - avg_days_between_purchases -> días promedio entre compra y compra de cada usuario.
+                - Selección final según distribución normal truncada -> (mínimo  = 1 & máximo = datetime.now()).
+            - std_days_between_purchases -> desvío estandar de días de avg_days_between_purchases.
             - liked_churn_rate -> La probabilidad de que el usuario churnee habiéndole gustado la última selección.
             - disliked_churn_rate -> La probabilidad de que el usuario churnee habiéndole disgustago al última selección.
+            - max_repurchases -> La cantidad máxima de recompras que puede tener un  usuario.
 
         Returns:
             - Historial de interacciones del usuario con la app.
         """
-        user_repurchases = user_first_pick_data
+        user_history = user_first_pick_data
+        timestamp = user_first_pick_data.loc[0, "timestamp"]
+        user_id = user_first_pick_data.loc[0, "user_id"]
         liked = user_first_pick_data.loc[0, "liked"]
+        repurchase_count = 0
         
-        while True:
+        while repurchase_count <= max_repurchases:
             churn_prob = liked_churn_rate if liked == 1 else disliked_churn_rate
             if np.random.rand() > churn_prob:
-                user_data = self.simulate_user_behaviour(user_id=user_id)
-                user_repurchases = pd.concat(user_data, ignore_index=True)
+                # Creación de recompra
+                user_data = self.simulate_user_behaviour(
+                    user_id=user_id,
+                    last_timestamp=timestamp,
+                    avg_days_between_purchases=avg_days_between_purchases,
+                    std_days_between_purchases=std_days_between_purchases
+                    )
+                # Adición a la historia del user
+                user_history = pd.concat(user_data, ignore_index=True)
+                # Actualizamos parámetros para próxima recompra
+                timestamp = user_data.loc[0, "timestamp"]
                 liked = 0 if user_data.loc[0, "liked"] is None else user_data.loc[0, "liked"]
+                repurchase_count += 1
             else:
                 break
 
         
-        return user_repurchases
+        return user_history
 
 
-    def generate_synthetic_data(self, n_users: int, repurchase: bool = False, verbose: bool = True) -> pd.DataFrame:
+    # TODO: explorar @dataclass para no tener que pasar los mismos argumentos una y otra vez.
+    def generate_synthetic_data(
+            self,
+            n_users: int,
+            first_start_date: datetime=datetime(2022,1,1),
+            first_end_date: datetime=datetime(2024,1,1),
+            repurchase: bool = False,
+            avg_days_between_purchases: int=30,
+            std_days_between_purchases: int=5,
+            liked_churn_rate: float=0.05,
+            disliked_churn_rate: float=0.40,
+            max_repurchases: int=20,
+            verbose: bool = True
+        ) -> pd.DataFrame:
         """
         Genera datos sintéticos para n usuarios.
 
@@ -809,18 +879,23 @@ class SyntheticUserSimulator:
 
         for i in range(n_users):
             if repurchase:
-                user_interactions = []
                 # First user interaction with the app
-                user_data = self.simulate_user_behaviour(user_id=i)
+                user_data = self.simulate_user_behaviour(
+                    user_id=i,
+                    first_start_date=first_start_date,
+                    first_end_date=first_end_date
+                )
                 # Adds all repurchases to user first interaction
-                user_repurchases = self.simulate_user_repurchases(
-                    user_id = i,
+                user_history = self.simulate_user_repurchases(
                     user_first_pick_data=user_data,
-                    liked_churn_rate=0.05,
-                    disliked_churn_rate=0.40
+                    avg_days_between_purchases=avg_days_between_purchases,
+                    std_days_between_purchases=std_days_between_purchases,
+                    liked_churn_rate=liked_churn_rate,
+                    disliked_churn_rate=disliked_churn_rate,
+                    max_repurchases=max_repurchases
                 )
                 # Appending all user interaction history
-                synthetic_data.append(user_repurchases)
+                synthetic_data.append(user_history)
             else:
                 user_data = self.simulate_user_behaviour(user_id=i)
                 synthetic_data.append(user_data)
