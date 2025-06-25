@@ -702,98 +702,50 @@ class SyntheticUserSimulator:
         return liked, prob_like
 
 
-    def simulate_user_behaviour(self, user_id: int) -> Dict[str, Union[int, None, Dict, float]]:
-        """
-        Simula el comportamiento completo de un usuario individual.
-            - Evaluación de vinos.
-            - Elección de vino.
-            - Opinión del vino (like = 1 | 0).
-            - Recompra o churn de la app.
-
-        Args:
-            - user_id -> id del usuario a simular.
-
-        Returns:
-            - Diccionario con datos del usuario, su evaluación, elección y opinión.
-        """
-        user_data = None
-
-        user_input = self.generate_user_input()
-        tra_df = self.tra_df
-        tra_df = self._df_add_qual_price(tra_df)
-        tra_df = self._score_wines(tra_df, user_input)
-        user_choice_pack = self.simulate_user_choice(tra_df, user_input)
-
-        if user_choice_pack is None:
-            user_data = {
-                "user_id": user_id,
-                "wine_id": None,
-                "user_input": user_input,
-                "metrics_local": None,
-                "metrics_global": None,
-                "liked": None,
-                "prob_like": None
-            }
-        else:
-            selected_wine = user_choice_pack["selected_wine"]
-            tra_df = user_choice_pack["global_wine_base"]
-            liked, prob_like = self.simulate_like(tra_df, selected_wine)
-            user_data = {
-                "user_id": user_id,
-                "wine_id": int(selected_wine.name),
-                "user_input": user_input,
-                "metrics_local": selected_wine["rating_rscld":],
-                "metrics_global": selected_wine["rating_rscld_gbl":"wine_score_scld_gbl"],
-                "liked": liked,
-                "prob_like": prob_like
-            }
-        
-        return user_data
-    
-
-    def simulate_user_repurchases(
+    def simulate_user_active_days(
             self,
-            user_id: int,
-            user_first_pick_data: Dict,
+            initial_liked: int,
             liked_churn_rate: float=.05,
-            disliked_churn_rate: float=.4
+            disliked_churn_rate: float=.4,
+            days_between_purchases: int=30
         ) -> int:
         """
-        Simula las recompras de un usuario mientras está activo en la app.
-            - Tomar assumption de cada cuanto un usuario realiza sus compras en promedio.
+        Simula la cantidad de días que el usuario va a seguir estando activo en la app.
 
         Args:
-            - user_id -> Usuario al cual realizar la simulación de recompras.
             - initial_liked -> La primera opinión del usuario (like = 1 | 0).
             - liked_churn_rate -> La probabilidad de que el usuario churnee habiéndole gustado la última selección.
             - disliked_churn_rate -> La probabilidad de que el usuario churnee habiéndole disgustago al última selección.
+            - days_between_purchases -> Días promedio entre cada compra del usuario.
 
         Returns:
-            - Historial de interacciones del usuario con la app.
+            - Cantidad de días en los que el usuario estuvo activo en la app.
         """
-        user_repurchases = user_first_pick_data
-        liked = user_first_pick_data.loc[0, "liked"]
+
+        # TODO: en vez de simular la cantidad de días que está activo simplemente
+    
+        days_active = 0
+        liked = initial_liked
         
         while True:
             churn_prob = liked_churn_rate if liked == 1 else disliked_churn_rate
             if np.random.rand() > churn_prob:
-                user_data = self.simulate_user_behaviour(user_id=user_id)
-                user_repurchases = pd.concat(user_data, ignore_index=True)
-                liked = 0 if user_data.loc[0, "liked"] is None else user_data.loc[0, "liked"]
+                days_active += days_between_purchases
             else:
                 break
 
+            user_pick = self.generate_synthetic_data(n_users=1, verbose=False)
+            liked = user_pick.loc[0, "liked"]
         
-        return user_repurchases
+        return days_active
 
 
-    def generate_synthetic_data(self, n_users: int, repurchase: bool = False, verbose: bool = True) -> pd.DataFrame:
+    def generate_synthetic_data(self, n_users: int, verbose: bool = True) -> pd.DataFrame:
         """
         Genera datos sintéticos para n usuarios.
 
         Parameters:
             - n_users -> Cantidad de usuarios sintéticos a simular.
-            - repurchase -> Posibilidad de que los usuarios vuelvan a comprar.
             - verbose -> Mostrar progreso de simulación.
 
         Returns:
@@ -805,25 +757,39 @@ class SyntheticUserSimulator:
         synthetic_data = []
 
         if verbose:
-            print(f"Iniciando simulación de {n_users} usuarios {"con" if repurchase else "sin"} recompra...")
+            print(f"Iniciando simulación de {n_users} usuarios...")
 
         for i in range(n_users):
-            if repurchase:
-                user_interactions = []
-                # First user interaction with the app
-                user_data = self.simulate_user_behaviour(user_id=i)
-                # Adds all repurchases to user first interaction
-                user_repurchases = self.simulate_user_repurchases(
-                    user_id = i,
-                    user_first_pick_data=user_data,
-                    liked_churn_rate=0.05,
-                    disliked_churn_rate=0.40
-                )
-                # Appending all user interaction history
-                synthetic_data.append(user_repurchases)
+            user_input = self.generate_user_input()
+            tra_df = self.tra_df
+            tra_df = self._df_add_qual_price(tra_df)
+            tra_df = self._score_wines(tra_df, user_input)
+            user_choice_pack = self.simulate_user_choice(tra_df, user_input)
+            # TODO: incluir lógica de simulación de active days
+
+            if user_choice_pack is None:
+                synthetic_data.append({
+                    "user_id": i,
+                    "wine_id": None,
+                    "user_input": user_input,
+                    "metrics_local": None,
+                    "metrics_global": None,
+                    "liked": None,
+                    "prob_like": None
+                })
             else:
-                user_data = self.simulate_user_behaviour(user_id=i)
-                synthetic_data.append(user_data)
+                selected_wine = user_choice_pack["selected_wine"]
+                tra_df = user_choice_pack["global_wine_base"]
+                liked, prob_like = self.simulate_like(tra_df, selected_wine)
+                synthetic_data.append({
+                    "user_id": i,
+                    "wine_id": int(selected_wine.name),
+                    "user_input": user_input,
+                    "metrics_local": selected_wine["rating_rscld":],
+                    "metrics_global": selected_wine["rating_rscld_gbl":"wine_score_scld_gbl"],
+                    "liked": liked,
+                    "prob_like": prob_like
+                })
             
             if verbose:
                 # Barra de progreso que se actualiza en la misma línea
