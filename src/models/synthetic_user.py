@@ -756,8 +756,9 @@ class SyntheticUserSimulator:
             timestamp = first_start_date + timedelta(days=np.random.randint(0, days_range))
         else:
         # Fecha de siguiente interacción
+            days_till_today = (datetime.now() - last_timestamp).days
             days_until_next_purchase = int(
-                np.clip(np.random.normal(avg_days_between_purchases, std_days_between_purchases), 1, datetime.now())
+                np.clip(np.random.normal(avg_days_between_purchases, std_days_between_purchases), 1, days_till_today)
             )
             timestamp = last_timestamp + timedelta(days=days_until_next_purchase)
 
@@ -804,7 +805,7 @@ class SyntheticUserSimulator:
             - Tomar assumption de cada cuanto un usuario realiza sus compras en promedio.
 
         Args:
-            - user_first_pick_data -> DataFrame con la primera selección del usuario.
+            - user_first_pick_data -> Diccionario con la primera selección del usuario.
             - avg_days_between_purchases -> días promedio entre compra y compra de cada usuario.
                 - Selección final según distribución normal truncada -> (mínimo  = 1 & máximo = datetime.now()).
             - std_days_between_purchases -> desvío estandar de días de avg_days_between_purchases.
@@ -815,10 +816,10 @@ class SyntheticUserSimulator:
         Returns:
             - Historial de interacciones del usuario con la app.
         """
-        user_history = user_first_pick_data
-        timestamp = user_first_pick_data.loc[0, "timestamp"]
-        user_id = user_first_pick_data.loc[0, "user_id"]
-        liked = user_first_pick_data.loc[0, "liked"]
+        user_history = [user_first_pick_data]
+        timestamp = user_first_pick_data["event_timestamp"]
+        user_id = user_first_pick_data["user_id"]
+        liked = user_first_pick_data["liked"]
         repurchase_count = 0
         
         while repurchase_count <= max_repurchases:
@@ -832,10 +833,10 @@ class SyntheticUserSimulator:
                     std_days_between_purchases=std_days_between_purchases
                     )
                 # Adición a la historia del user
-                user_history = pd.concat(user_data, ignore_index=True)
+                user_history.append(user_data)
                 # Actualizamos parámetros para próxima recompra
-                timestamp = user_data.loc[0, "timestamp"]
-                liked = 0 if user_data.loc[0, "liked"] is None else user_data.loc[0, "liked"]
+                timestamp = user_data["event_timestamp"]
+                liked = 0 if user_data["liked"] is None else user_data["liked"]
                 repurchase_count += 1
             else:
                 break
@@ -843,7 +844,8 @@ class SyntheticUserSimulator:
         
         return user_history
 
-
+    
+    # TODO: returnear parámetros de simulación además de DataFrame.
     # TODO: explorar @dataclass para no tener que pasar los mismos argumentos una y otra vez.
     def generate_synthetic_data(
             self,
@@ -895,7 +897,7 @@ class SyntheticUserSimulator:
                     max_repurchases=max_repurchases
                 )
                 # Appending all user interaction history
-                synthetic_data.append(user_history)
+                synthetic_data.extend(user_history)
             else:
                 user_data = self.simulate_user_behaviour(user_id=i)
                 synthetic_data.append(user_data)

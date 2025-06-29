@@ -1,13 +1,26 @@
-from pathlib import Path
+from datetime import datetime
+
 import pandas as pd
 
 from models.synthetic_user import SyntheticUserSimulator
 from src.utils.utils import get_project_file_path
 
-# Cantidad de simulaciones a generar
-simulation_name = "simulation_03"
-n_simulations = 3000
-saving_path = get_project_file_path("src", "data", "synthetic", f"{simulation_name}_n{n_simulations}.pkl")
+# Parámetros de la simulación
+simulation_name = "simulation_07_0.008_0.65"
+n_users = 400
+user_acq_start_date = datetime(2022,1,1)
+user_acq_end_date = datetime(2024,1,1)
+repurchases_allowed = True
+avg_days_between_purchases = 30
+std_days_between_purchases = 5
+liked_churn_rate = 0.008
+disliked_churn_rate = 0.65
+max_repurchases = 20
+verbose= True
+
+# Saving Path
+repurchase_text = "repchs" if repurchases_allowed else "single"
+saving_path = get_project_file_path("src", "data", "synthetic", f"{simulation_name}_n{n_users}_{repurchase_text}.pkl")
 
 # Class Main Inputs
 wines_df = pd.read_csv(get_project_file_path("src", "data", "transformed", "wines_clean.csv"))      # DataFrame de vinos
@@ -36,6 +49,18 @@ user = SyntheticUserSimulator(
     weights=simulation_weights
 )
 
-data = user.generate_synthetic_data(n_simulations)
+# Data Creation
+data = user.generate_synthetic_data(
+    n_users=n_users,
+    first_start_date=user_acq_start_date,
+    first_end_date=user_acq_end_date,
+    repurchase=repurchases_allowed,
+    avg_days_between_purchases=avg_days_between_purchases,
+    std_days_between_purchases=std_days_between_purchases,
+    liked_churn_rate=liked_churn_rate,
+    disliked_churn_rate=disliked_churn_rate,
+    max_repurchases=max_repurchases,
+    verbose=verbose
+)
 pd.to_pickle(data, saving_path)
 print(f"Guardado en {saving_path}")
