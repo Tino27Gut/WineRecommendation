@@ -7,7 +7,7 @@ from src.utils.utils import get_project_file_path
 
 # Parámetros de la simulación
 simulation_name = "simulation_07_0.008_0.65"
-n_users = 400
+n_users = 1
 user_acq_start_date = datetime(2022,1,1)
 user_acq_end_date = datetime(2024,1,1)
 repurchases_allowed = True
@@ -20,7 +20,8 @@ verbose= True
 
 # Saving Path
 repurchase_text = "repchs" if repurchases_allowed else "single"
-saving_path = get_project_file_path("src", "data", "synthetic", f"{simulation_name}_n{n_users}_{repurchase_text}.pkl")
+data_saving_path = get_project_file_path("src", "data", "synthetic", f"{simulation_name}_n{n_users}_{repurchase_text}.pkl")
+params_saving_path = get_project_file_path("src", "data", "synthetic", f"{simulation_name}_n{n_users}_{repurchase_text}_params.pkl")
 
 # Class Main Inputs
 wines_df = pd.read_csv(get_project_file_path("src", "data", "transformed", "wines_clean.csv"))      # DataFrame de vinos
@@ -50,7 +51,7 @@ user = SyntheticUserSimulator(
 )
 
 # Data Creation
-data = user.generate_synthetic_data(
+data, params = user.generate_synthetic_data(
     n_users=n_users,
     first_start_date=user_acq_start_date,
     first_end_date=user_acq_end_date,
@@ -62,5 +63,7 @@ data = user.generate_synthetic_data(
     max_repurchases=max_repurchases,
     verbose=verbose
 )
-pd.to_pickle(data, saving_path)
-print(f"Guardado en {saving_path}")
+
+pd.to_pickle(data, data_saving_path)
+pd.to_pickle(params, params_saving_path)
+print(f"Guardado en {data_saving_path}")

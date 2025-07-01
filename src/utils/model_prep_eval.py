@@ -106,6 +106,8 @@ def train_test_model(
         "test_report": classification_report(y_test, y_pred),
         "test_cmax": disp_pred,
         "test_auc": roc_auc_score(y_test, y_pred_proba),
+        "X_train": X_train,
+        "y_train": y_train,
         "X_test": X_test,
         "y_test": y_test,
         "cm_train": cm_train,
@@ -135,10 +137,10 @@ def print_model_results(results: Dict[str, Union[str, object, float]]) -> None:
     print(results["test_report"])
     results["test_cmax"].plot()
     plt.show()
-    print("AUC Train:", results["test_auc"])
+    print("AUC Test:", results["test_auc"])
 
 
-def calc_next_exp_val(
+def _calc_next_exp_val(
         avg_tkt: float,
         churn_like: float,
         churn_dislike: float,
@@ -193,9 +195,9 @@ def economic_score(
 
     true_precision = tp / (tp + fp)
 
-    val_tn = calc_next_exp_val(avg_tkt, churn_like, churn_dislike, true_precision, type="TN")
+    val_tn = _calc_next_exp_val(avg_tkt, churn_like, churn_dislike, true_precision, type="TN")
     cost_fp = - avg_tkt * churn_dislike
-    cost_fn = calc_next_exp_val(avg_tkt, churn_like, churn_dislike, true_precision, type="FN")
+    cost_fn = _calc_next_exp_val(avg_tkt, churn_like, churn_dislike, true_precision, type="FN")
     val_tp = avg_tkt * (1 - churn_like)
 
     score = (

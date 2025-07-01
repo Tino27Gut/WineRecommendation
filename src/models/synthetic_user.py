@@ -845,7 +845,6 @@ class SyntheticUserSimulator:
         return user_history
 
     
-    # TODO: returnear parámetros de simulación además de DataFrame.
     # TODO: explorar @dataclass para no tener que pasar los mismos argumentos una y otra vez.
     def generate_synthetic_data(
             self,
@@ -859,20 +858,27 @@ class SyntheticUserSimulator:
             disliked_churn_rate: float=0.40,
             max_repurchases: int=20,
             verbose: bool = True
-        ) -> pd.DataFrame:
+        ) -> Tuple[pd.DataFrame, Dict[str, Union[int, float, datetime, bool]]]:
         """
-        Genera datos sintéticos para n usuarios.
+        Genera datos sintéticos de comportamiento de usuarios que simulan compras iniciales 
+        y posibles recompras en el tiempo, incluyendo historial, fechas y decisiones de consumo.
 
-        Parameters:
-            - n_users -> Cantidad de usuarios sintéticos a simular.
-            - repurchase -> Posibilidad de que los usuarios vuelvan a comprar.
-            - verbose -> Mostrar progreso de simulación.
+        Args:
+            - n_users -> Cantidad de usuarios a simular.
+            - first_start_date -> Fecha inicial posible para la primera compra de un usuario.
+            - first_end_date -> Fecha final posible para la primera compra de un usuario.
+            - repurchase -> Si True, se simula también el historial de recompras por usuario.
+            - avg_days_between_purchases -> Días promedio entre compras consecutivas.
+            - std_days_between_purchases -> Desvío estándar de días entre compras consecutivas.
+            - liked_churn_rate -> Probabilidad de churn luego de una compra satisfactoria.
+            - disliked_churn_rate -> Probabilidad de churn luego de una compra insatisfactoria.
+            - max_repurchases -> Límite superior de cantidad de recompras simuladas por usuario.
+            - verbose -> Si True, imprime mensajes de progreso y resumen de simulación.
 
         Returns:
-            - DataFrame con columnas
-                - user_id -> id del usuario que realiza la selección.
-                - wine_id -> id del vino seleccionado
-                - user_input -> Diccionario con input del usuario, , liked
+            - Tuple con dos elementos:
+                - DataFrame -> Contiene el histórico sintético generado para todos los usuarios.
+                - Dict -> Diccionario con los parámetros usados en la simulación.
         """
         synthetic_data = []
 
@@ -918,5 +924,18 @@ class SyntheticUserSimulator:
         if verbose: 
             print("\n✅ Simulación Terminada con Éxito!")
 
-        return pd.DataFrame(synthetic_data)
+        params_dict = {
+            "n_users": n_users,
+            "first_start_date": first_start_date,
+            "first_end_date": first_end_date,
+            "repurchase": repurchase,
+            "avg_days_between_purchases": avg_days_between_purchases,
+            "std_days_between_purchases": std_days_between_purchases,
+            "liked_churn_rate": liked_churn_rate,
+            "disliked_churn_rate": disliked_churn_rate,
+            "max_repurchases": max_repurchases,
+            "verbose": verbose
+        }
+
+        return pd.DataFrame(synthetic_data), params_dict
 
