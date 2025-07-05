@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, classification_report, roc_auc_score
 from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import SMOTENC
+from sklearn.base import clone
+from scipy import stats
 
 
 # ==============================
@@ -121,6 +123,110 @@ def train_test_model(
     }    
 
 
+def train_val_test_model(
+        X: Union[pd.Series, pd.DataFrame],
+        y: Union[pd.Series, pd.DataFrame],
+        model_object: object,
+        val_size: float = 0.2,
+        test_size: float = 0.2,
+        random_state: Union[int, None] = None,
+        stratify: Union[pd.Series, pd.DataFrame, None] = None
+    ) -> Dict[str, Union[str, object, float]]:
+    """
+    Realiza el split de los datos, entrena el modelo, evalúa en train, validation y test, 
+    y retorna métricas de performance junto con la matriz de confusión.
+
+    Args:
+        - X -> Variables independientes (features).
+        - y -> Variable dependiente (target).
+        - model_object -> Modelo de sklearn (u otro con .fit y .predict_proba).
+        - val_size -> Proporción del set que se usará como validation.
+        - test_size -> Proporción del set que se usará como test.
+        - random_state -> Semilla para reproducibilidad.
+        - stratify -> Variable para realizar stratified split (recomendado si la clase está desbalanceada).
+
+    Returns:
+        - Diccionario con los siguientes resultados
+
+            - "train_report" -> Reporte de clasificación en train (str).
+            - "train_cmax" -> Visualización de matriz de confusión en train (ConfusionMatrixDisplay).
+            - "train_auc" -> AUC score en el set de entrenamiento (float).
+
+            - "val_report" -> Reporte de clasificación en val (str).
+            - "val_cmax" -> Visualización de matriz de confusión en val (ConfusionMatrixDisplay).
+            - "val_auc" -> AUC score en el set de validación (float).
+
+            - "test_report" -> Reporte de clasificación en test (str).
+            - "test_cmax" -> Visualización de matriz de confusión en test (ConfusionMatrixDisplay).
+            - "test_auc" -> AUC score en el set de test (float).
+
+            - "X_test" -> Features de test (pd.DataFrame).
+            - "y_test" -> Labels de test (pd.Series).
+
+            - "cm_train" -> Matriz de confusión de train (np.ndarray).
+            - "cm_val" -> Matriz de confución de validation (np.ndarray).
+            - "cm_pred" -> Matriz de confusión de test (np.ndarray).
+    """
+    # Split de datos en train y test
+    X_train, X_val, X_test, y_train, y_val, y_test = train_test_val_split(
+        X,
+        y,
+        val_size=val_size,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=stratify
+    )
+    
+    # Entrenamiento
+    model_object.fit(X_train, y_train)
+
+    # Predicción de train
+    y_train_proba = model_object.predict_proba(X_train)[:, 1]
+    y_train_pred = model_object.predict(X_train)
+    cm_train = confusion_matrix(y_train, y_train_pred, normalize="all")
+    disp_train = ConfusionMatrixDisplay(confusion_matrix=cm_train, display_labels=model_object.classes_)
+
+    # Predicción de val
+    y_val_proba = model_object.predict_proba(X_val)[:, 1]
+    y_val_pred = model_object.predict(X_val)
+    cm_val = confusion_matrix(y_val, y_val_pred, normalize="all")
+    disp_val = ConfusionMatrixDisplay(confusion_matrix=cm_val, display_labels=model_object.classes_)
+
+    # Predicción de test
+    y_pred_proba = model_object.predict_proba(X_test)[:, 1]
+    y_pred = model_object.predict(X_test)
+    cm_pred = confusion_matrix(y_test, y_pred, normalize="all")
+    disp_pred = ConfusionMatrixDisplay(confusion_matrix=cm_pred, display_labels=model_object.classes_)
+
+    return {
+        # Train report, confusion matrix y AUC
+        "train_report": classification_report(y_train, y_train_pred),
+        "train_cmax": disp_train,
+        "train_auc": roc_auc_score(y_train, y_train_proba),
+        # Validation report, confusion matrix y AUC
+        "val_report": classification_report(y_val, y_val_pred),
+        "val_cmax": disp_val,
+        "val_auc": roc_auc_score(y_val, y_val_proba),
+        # Test report, confusion matrix y AUC
+        "test_report": classification_report(y_test, y_pred),
+        "test_cmax": disp_pred,
+        "test_auc": roc_auc_score(y_test, y_pred_proba),
+        # Train set
+        "X_train": X_train,
+        "y_train": y_train,
+        # Validation set
+        "X_val": X_val,
+        "y_val": y_val,
+        # Test set
+        "X_test": X_test,
+        "y_test": y_test,
+        # Confusion Matrixes
+        "cm_train": cm_train,
+        "cm_val": cm_val,
+        "cm_pred": cm_pred
+    }    
+
+
 def print_model_results(results: Dict[str, Union[str, object, float]]) -> None:
     """
     Imprime los resultados del modelo en consola y visualiza las matrices de confusión para 
@@ -196,11 +302,29 @@ def train_test_val_split(
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
-def plot_learning_curves(base_model: object, params_dict: Dict[str, List]) -> None:
+def plot_learning_curves(
+        X_train: Union[pd.DataFrame, pd.Series],
+        X_val: Union[pd.DataFrame, pd.Series],
+        y_train: Union[pd.DataFrame, pd.Series],
+        y_val: Union[pd.DataFrame, pd.Series],
+        base_model: object,
+        params_dict: Dict[str, List],
+        eco_score_dict: Dict[str, Union[float, int]]
+    ) -> None:
     """
     Genera gráficos con curvas de aprendizaje para cada parámetro y valor pasado.
+
+    Args:
+        - X_train -> features para entrenar el modelo.
+        - X_val -> features de entrada para predecir con el modelo.
+        - y_train -> output real para entrenar el modelo.
+        - y_val -> output real para comparar contra lo predicho por el modelo.
+        - base_model -> modelo a tomar como base para plotear las curvas de aprendizaje.
+        - params_dict -> diccionario de parámetros y valores para pasarle al base_model en cada iteración.
+
+    Returns:
+        - None -> plotea las curvas, pero no devuelve nada en si.
     """
-    # TODO: documentar y pasar a random_forest_draft_v2 y random_forest
     # Iterar sobre parámetros y valores
     for param, values in params_dict.items():
 
@@ -230,14 +354,19 @@ def plot_learning_curves(base_model: object, params_dict: Dict[str, List]) -> No
             auc_train_scores.append(auc_train)
             auc_val_scores.append(auc_val)
 
+            # Obtener los parámetros para score económico
+            avg_tkt = eco_score_dict["avg_tkt"]
+            churn_like = eco_score_dict["churn_like"]
+            churn_dislike = eco_score_dict["churn_dislike"]
+
             # Calcular y hacer append de economic score en train y validation
             pred_train = model.predict(X_train)
             train_cm = confusion_matrix(y_train, pred_train)
-            eco_train = mod_prep.economic_score(train_cm, avg_tkt, churn_like, churn_dislike)
+            eco_train = economic_score(train_cm, avg_tkt, churn_like, churn_dislike)
 
             pred_val = model.predict(X_val)
             val_cm = confusion_matrix(y_val, pred_val)
-            eco_val = mod_prep.economic_score(val_cm, avg_tkt, churn_like, churn_dislike)
+            eco_val = economic_score(val_cm, avg_tkt, churn_like, churn_dislike)
 
             eco_train_scores.append(eco_train)
             eco_val_scores.append(eco_val)
