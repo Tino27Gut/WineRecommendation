@@ -1,4 +1,4 @@
-from typing import Union, List, Dict, Tuple, Literal
+from typing import Union, List, Dict, Tuple, Literal, Optional
 
 import pandas as pd
 import numpy as np
@@ -8,13 +8,16 @@ from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import SMOTENC
 
 
+# ==============================
+# OVERSAMPLING
+# ==============================
 def oversample_df(
         df: pd.DataFrame,
         sampling_object: object,
         random_state: Union[int, None] = None,
         categorical_features: Union[List[str], None] = None,
         class_col: str = "liked"    
-    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    ) -> Tuple[pd.DataFrame, pd.Series]:
     """
     Oversamplea un DataFrame utilizando un objeto de oversampling proporcionado 
     (por ejemplo, SMOTE o SMOTENC).
@@ -48,6 +51,9 @@ def oversample_df(
     return X_resampled, y_resampled
 
 
+# ==============================
+# MODEL PREP-TEST-DISPLAY
+# ==============================
 def train_test_model(
         X: Union[pd.Series, pd.DataFrame],
         y: Union[pd.Series, pd.DataFrame],
@@ -140,6 +146,135 @@ def print_model_results(results: Dict[str, Union[str, object, float]]) -> None:
     print("AUC Test:", results["test_auc"])
 
 
+def train_test_val_split(
+        X: pd.DataFrame,
+        y: Union[pd.DataFrame, pd.Series],
+        val_size: float,
+        test_size: float,
+        random_state: Optional[int],
+        stratify: Optional[pd.Series]
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
+    """
+    Hace un split de los datos en grupos train, validation y test
+
+    Args:
+        - X -> variables independientes.
+        - y -> variable dependiente a predecir.
+        - val_size -> porcentaje a usar del dataset original como datos de validación.
+        - val_size -> porcentaje a usar del dataset original como datos de test.
+        - random_state -> semilla para reproducibilidad.
+        - stratify -> variable dependiente para mantener mismo balance de clases.
+
+    Returns:
+        - Tupla X_train, X_val, X_test, y_train, y_val, y_test
+    """
+
+    # Train test split
+    X_trainval, X_test, y_trainval, y_test = train_test_split(
+        X,
+        y,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=stratify
+    )
+
+    # Calcula el valor del test_size para que val_size sea el % correcto del dataset total
+    adj_val_size = val_size / (1 - test_size)
+
+    # Setea stratify en caso que haya sido definido
+    val_stratify = y_trainval if stratify is not None else None
+
+    # Train val split
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_trainval,
+        y_trainval,
+        test_size=adj_val_size,
+        random_state=random_state,
+        stratify=val_stratify
+    )
+
+    return X_train, X_val, X_test, y_train, y_val, y_test
+
+
+def plot_learning_curves(base_model: object, params_dict: Dict[str, List]) -> None:
+    """
+    Genera gráficos con curvas de aprendizaje para cada parámetro y valor pasado.
+    """
+    # TODO: documentar y pasar a random_forest_draft_v2 y random_forest
+    # Iterar sobre parámetros y valores
+    for param, values in params_dict.items():
+
+        # Crear listas de scores vacías para cada parámetro
+        auc_train_scores = []
+        auc_val_scores = []
+        eco_train_scores = []
+        eco_val_scores = []
+        
+        # Crear modelo con hiperparámetros default
+        model = clone(base_model)
+        
+        for val in values:
+            # Setear el valor del parámetro pasado en params_values
+            setattr(model, param, val)
+
+            # Entrenar el modelo
+            model.fit(X_train, y_train)
+
+            # Calcular y hacer append de AUC en train y validation
+            pred_prob_train = model.predict_proba(X_train)[:, 1]
+            auc_train = roc_auc_score(y_train, pred_prob_train)
+            
+            pred_prob_val = model.predict_proba(X_val)[:, 1]
+            auc_val = roc_auc_score(y_val, pred_prob_val)
+
+            auc_train_scores.append(auc_train)
+            auc_val_scores.append(auc_val)
+
+            # Calcular y hacer append de economic score en train y validation
+            pred_train = model.predict(X_train)
+            train_cm = confusion_matrix(y_train, pred_train)
+            eco_train = mod_prep.economic_score(train_cm, avg_tkt, churn_like, churn_dislike)
+
+            pred_val = model.predict(X_val)
+            val_cm = confusion_matrix(y_val, pred_val)
+            eco_val = mod_prep.economic_score(val_cm, avg_tkt, churn_like, churn_dislike)
+
+            eco_train_scores.append(eco_train)
+            eco_val_scores.append(eco_val)
+
+        # Normalización de scores (misma escala en sets de train y val)
+        eco_train_scores_z = stats.zscore(eco_train_scores)
+        eco_val_scores_z = stats.zscore(eco_val_scores)
+
+        # Plotear Learning Curves
+        param_scores_pairs = {
+            "AUC": [auc_train_scores, auc_val_scores],
+            "Model Gain Scld ($)": [eco_train_scores_z, eco_val_scores_z]
+        }
+
+        fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(14, 6))
+
+        if None in values:
+            none_idx = values.index(None)
+            values[none_idx] = "None"
+
+        for i, (metric, pair) in enumerate(param_scores_pairs.items()):
+            ax = axes[i]
+            ax.plot(values, pair[0], label=f"Train {metric}", marker="o")
+            ax.plot(values, pair[1], label=f"Validation {metric}", marker="o")
+            ax.set_xlabel(param)
+            ax.set_ylabel(f"{metric}")
+            ax.set_title(f"Learning Curve - {param}")
+            ax.legend()
+            ax.grid(True)
+
+        plt.tight_layout()
+        plt.show()
+
+
+# ==============================
+# CÁLCULO DE SCORE ECONÓMICO
+# ==============================
 def _calc_next_exp_val(
         avg_tkt: float,
         churn_like: float,
