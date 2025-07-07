@@ -58,8 +58,8 @@ class SyntheticUserSimulator:
         self.robust_scaler = RobustScaler()
         self.wine_df = wine_df
 
-        # Pre-transformación de df (escalado tastes + agrega "otras uvas")
-        self.tra_df, self.taste_cols_scld = self._transform_df()
+        # Pre-transformación de df (agrega "otras uvas" + quality-price global)
+        self.tra_df = self._transform_df()
 
         # Perfiles de pairing (cuantiles y stds por pairing y taste)
         self._taste_profiles, self._taste_deviations = self._build_pairing_profile()
@@ -84,16 +84,16 @@ class SyntheticUserSimulator:
             "precio_min": selected_price_range[0],
             "precio_max": selected_price_range[1],
             "tastes": {
-                "body": selected_profile["body_scld"][1],
-                "tannins": selected_profile["tannins_scld"][1],
-                "sweetness": selected_profile["sweetness_scld"][1],
-                "acidity": selected_profile["acidity_scld"][1]
+                "body": selected_profile["body"][1],
+                "tannins": selected_profile["tannins"][1],
+                "sweetness": selected_profile["sweetness"][1],
+                "acidity": selected_profile["acidity"][1]
             },
             "tastes_label": {
-                "body": selected_profile["body_scld"][0],
-                "tannins": selected_profile["tannins_scld"][0],
-                "sweetness": selected_profile["sweetness_scld"][0],
-                "acidity": selected_profile["acidity_scld"][0]
+                "body": selected_profile["body"][0],
+                "tannins": selected_profile["tannins"][0],
+                "sweetness": selected_profile["sweetness"][0],
+                "acidity": selected_profile["acidity"][0]
             },
             "weights": self.weights
         }
@@ -119,7 +119,7 @@ class SyntheticUserSimulator:
             pairing_subset = self.tra_df[self.tra_df[pairing] == 1]
             profiles[pairing] = {}
             deviations[pairing] = {}
-            for taste in self.taste_cols_scld:
+            for taste in self.taste_cols:
                 # Cuantiles
                 taste_quantile = pairing_subset[taste].quantile(quantiles)
                 profiles[pairing][taste] = taste_quantile
@@ -176,7 +176,7 @@ class SyntheticUserSimulator:
         - Diccionario con el gusto preferido por cada variable de sabor (body, sweetness, etc.)
         """
         selected_profile = {}
-        for taste in self.taste_cols_scld:
+        for taste in self.taste_cols:
             quantiles = self._taste_profiles[main_pairing][taste]
             std = self._taste_deviations[main_pairing][taste]
 
@@ -188,6 +188,7 @@ class SyntheticUserSimulator:
                 ]
                 selected_val = np.random.choice(quant_random_options)
             else:
+                # Elección según distribución normal del sabora para el pairing seleccionado
                 median = quantiles[.5]
                 min_val = quantiles[0]
                 max_val = quantiles[1]
@@ -224,7 +225,7 @@ class SyntheticUserSimulator:
         
         # Gestiona valores atípicos (mayores que el máximo valor de los cuantiles)
         if value >= quant_values[-1]:
-            return quant_values[-1], [quant_values[-2], quant_values[-1]]
+            return categories[-1], [quant_values[-2], quant_values[-1]]
         
         # Gestiona valores atípicos (menores que el mínimo valor de los cuantiles)
         if 0 <= value < quant_values[0]:
@@ -332,34 +333,15 @@ class SyntheticUserSimulator:
         Pre-transforma el DataFrame para la simulación.
 
         Returns:
-        - DataFrame con:
-            1. Tastes escalados (body, tannins, etc.)
-            2. Columna "Otras Uvas".
-            3. Métrica de calidad-precio global.
-        - Lista con nombre de columnas de sabor escaladas.
+            - DataFrame con agregado de:
+                1. Columna "Otras Uvas".
+                2. Métrica de calidad-precio global.
         """
         tra_df = self.wine_df.copy()
-        tra_df, taste_cols_scld = self._df_add_scaled_tastes(tra_df)  # Escala tastes
         tra_df = self._df_group_other_grapes(tra_df)                  # Agrupa Otras Uvas
         tra_df = self._df_add_qual_price(tra_df)                      # Agrega Métrica Calidad-Precio
-        return tra_df, taste_cols_scld
+        return tra_df
 
-
-    def _df_add_scaled_tastes(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List]:
-        """
-        Escala columnas de sabor del dataframe (body, tannins, etc.)
-
-        Args:
-            - df -> DataFrame con las columnas taste a escalar.
-
-        Returns:
-            - DataFrame con columnas de sabor Min-Max scaled (sufijo '_scld').
-            - Lista con nombres de columnas de sabor escaladas.
-        """
-        tra_df = df.copy()
-        taste_cols_scld = [taste + "_scld" for taste in self.taste_cols]
-        tra_df[taste_cols_scld] = self.mm_scaler.fit_transform(tra_df[self.taste_cols])
-        return tra_df, taste_cols_scld
 
     def _df_group_other_grapes(self, df: pd.DataFrame, top_n_grapes: int = 8, drop: bool = True) -> pd.DataFrame:
         """
@@ -478,7 +460,7 @@ class SyntheticUserSimulator:
 
         tra_df = df.copy()
         # Calcula la similitud con los gustos del usuario con Fuzzy Distance
-        distances = self._compute_fuzzy_distance(tra_df[self.taste_cols_scld], tastes)
+        distances = self._compute_fuzzy_distance(tra_df[self.taste_cols], tastes)
         tra_df["user_similarity"] = 1 - (distances / distances.max())
         tra_df["taste_distance_raw"] = distances
         return tra_df
@@ -489,7 +471,7 @@ class SyntheticUserSimulator:
         Computa la distancia tipo fuzzy entre los gustos del usuario y los vinos disponibles.
 
         Args:
-        - tastes_df -> DataFrame de columnas taste escaladas.
+        - tastes_df -> Subset del DataFrame original solo con las columnas taste.
         - tastes -> Diccionario con gustos y preferencias del usuario.
 
         Returns:
@@ -501,11 +483,10 @@ class SyntheticUserSimulator:
             wine_distance = 0
             col_count = 0
             # Calculo de Fuzzy Distance de cada taste (columna)
-            for col in tastes_df.columns:
-                key = col.replace("_scld", "")
-                if key in tastes:
-                    value = row[col]
-                    q_low, q_high = tastes[key]
+            for col_name in tastes_df.columns:
+                if col_name in tastes:
+                    value = row[col_name]
+                    q_low, q_high = tastes[col_name]
                     wine_distance += self._fuzzy_distance(value, q_low, q_high)
                     col_count += 1
             
@@ -544,7 +525,7 @@ class SyntheticUserSimulator:
             self, scored_df: pd.DataFrame, user_input: Dict, top_n: int=20, d: float=.075
         ) -> Union[Dict[str, Union[pd.Series, pd.DataFrame]], None]:
         """
-        Elige los top_n vinos con mayor score.
+        Elige un vino de los top_n vinos con mayor score.
 
         Parameters:
             - scored_df -> DataFrame con vinos y sus scores globales calculados.

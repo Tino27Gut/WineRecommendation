@@ -6,8 +6,8 @@ from models.synthetic_user import SyntheticUserSimulator
 from src.utils.utils import get_project_file_path
 
 # Parámetros de la simulación
-simulation_name = "simulation_08_0.008_0.65"
-n_users = 1000
+simulation_name = "simulation_10"
+n_users = 2000
 user_acq_start_date = datetime(2022,1,1)
 user_acq_end_date = datetime(2024,1,1)
 repurchases_allowed = True
@@ -20,8 +20,8 @@ verbose= True
 
 # Saving Path
 repurchase_text = "repchs" if repurchases_allowed else "single"
-data_saving_path = get_project_file_path("src", "data", "synthetic", f"{simulation_name}_n{n_users}_{repurchase_text}.pkl")
-params_saving_path = get_project_file_path("src", "data", "synthetic", f"{simulation_name}_n{n_users}_{repurchase_text}_params.pkl")
+data_saving_path = get_project_file_path("src", "data", "synthetic", f"{simulation_name}.pkl")
+params_saving_path = get_project_file_path("src", "data", "synthetic", f"{simulation_name}_params.pkl")
 
 # Class Main Inputs
 wines_df = pd.read_csv(get_project_file_path("src", "data", "transformed", "wines_clean.csv"))      # DataFrame de vinos
