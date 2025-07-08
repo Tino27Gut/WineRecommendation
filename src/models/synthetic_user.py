@@ -382,7 +382,7 @@ class SyntheticUserSimulator:
                 - quality_price_rscld -> métrica de precio calidad entre 0 y 1 con escalado robusto.
         """
         tra_df = df.copy()
-        # Cálculo de zscore para rating y price (mediana = 0, std = 1)
+        # Escalado robusto
         rscaler = self.robust_scaler
         tra_df[['rating_rscld', 'price_rscld']] = rscaler.fit_transform(tra_df[["rating", "price"]])
                 
