@@ -2,6 +2,7 @@ import os
 from typing import List, Dict, Tuple, Union
 from pathlib import Path
 import pandas as pd
+import numpy as np
 
 # Scrapper
 from selenium import webdriver
@@ -118,6 +119,7 @@ def get_project_root() -> Path:
         "2. Asegurar estructura src/data/, src/models/ y src/utils/"
     )
 
+
 def get_project_file_path(*path_parts):
     """
     Construye rutas relativas al proyecto.
@@ -133,3 +135,16 @@ def get_project_file_path(*path_parts):
     """
     return get_project_root().joinpath(*path_parts)
 
+
+def sigmoid(x: float, center: float = 0.0, steepness: float = 1.0):
+    """
+    Calcula el sigmoide de x.
+
+    Args:
+        - center -> donde está centrado el punto 0.5 de la función sigmoide.
+        - steepness -> que tan empinada es la sigmoide en el centro.
+
+    Returns:
+        - Valor de x en la función sigmoide.
+    """
+    return 1 / (1 + np.exp(-steepness * (x - center)))
