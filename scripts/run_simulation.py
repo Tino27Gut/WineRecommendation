@@ -6,7 +6,7 @@ from models.synthetic_user import SyntheticUserSimulator
 from src.utils.utils import get_project_file_path
 
 # Parámetros de la simulación
-simulation_name = "simulation_10"
+simulation_name = "simulation_11"
 n_users = 2000
 user_acq_start_date = datetime(2022,1,1)
 user_acq_end_date = datetime(2024,1,1)
@@ -35,7 +35,7 @@ grapes = list(grapes["grapes"])                                                 
 simulation_weights = {
     "rating": .25,
     "price_quality": .25,
-    "rating_qty": .1,
+    "wine_popularity": .1,
     "user_similarity": .3,
     "main_pairing": .1
 }
