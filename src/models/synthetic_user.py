@@ -334,9 +334,9 @@ class SyntheticUserSimulator:
         # Eliminación de outliers (IQR * 1.5)
         no_outlier_price = ut.manage_outlier_IQR(df["price"], func="remove")
         price_quantiles = no_outlier_price.quantile(quantiles)
-
+        
         # Adición de extremos (sin precio mínimo / máximo)
-        price_quantiles[0], price_quantiles[1] = 0, -1
+        price_quantiles[0], price_quantiles[1] = 1, -1
         price_quantiles = price_quantiles.sort_index()
         price_quantiles = pd.Series(price_quantiles.values)
 

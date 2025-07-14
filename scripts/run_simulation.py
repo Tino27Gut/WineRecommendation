@@ -7,7 +7,7 @@ from src.utils.utils import get_project_file_path
 
 # Parámetros de la simulación
 simulation_name = "simulation_11"
-n_users = 2000
+n_users = 500
 user_acq_start_date = datetime(2022,1,1)
 user_acq_end_date = datetime(2024,1,1)
 repurchases_allowed = True
