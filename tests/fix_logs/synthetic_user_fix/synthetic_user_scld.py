@@ -1,9 +1,12 @@
 import random
+import logging
 from typing import Dict, Tuple, List, Union
 from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import RobustScaler
 
 import src.utils.utils as ut
 
@@ -14,7 +17,7 @@ default_pairings = list(default_pairings["pairings"])
 default_weights = {
     "rating": .25,
     "price_quality": .25,
-    "wine_popularity": .1,
+    "rating_qty": .1,
     "user_similarity": .3,
     "main_pairing": .1
 }
@@ -51,16 +54,15 @@ class SyntheticUserSimulator:
         self.grape_cols = grape_cols
         self.weights = weights
         self.top_n = top_n
+        self.mm_scaler = MinMaxScaler()
+        self.robust_scaler = RobustScaler()
         self.wine_df = wine_df
+
+        # Pre-transformación de df (escalado tastes + agrega "otras uvas")
+        self.tra_df, self.taste_cols_scld = self._transform_df()
 
         # Perfiles de pairing (cuantiles y stds por pairing y taste)
         self._taste_profiles, self._taste_deviations = self._build_pairing_profile()
-
-    
-    # ================================ #
-    # ↓↓↓ GENERACIÓN DE USER INPUT ↓↓↓ #
-    # ================================ #
-
 
     def generate_user_input(self) -> Dict:
         """
@@ -82,24 +84,52 @@ class SyntheticUserSimulator:
             "precio_min": selected_price_range[0],
             "precio_max": selected_price_range[1],
             "tastes": {
-                "body": selected_profile["body"][1],
-                "tannins": selected_profile["tannins"][1],
-                "sweetness": selected_profile["sweetness"][1],
-                "acidity": selected_profile["acidity"][1]
+                "body": selected_profile["body_scld"][1],
+                "tannins": selected_profile["tannins_scld"][1],
+                "sweetness": selected_profile["sweetness_scld"][1],
+                "acidity": selected_profile["acidity_scld"][1]
             },
             "tastes_label": {
-                "body": selected_profile["body"][0],
-                "tannins": selected_profile["tannins"][0],
-                "sweetness": selected_profile["sweetness"][0],
-                "acidity": selected_profile["acidity"][0]
+                "body": selected_profile["body_scld"][0],
+                "tannins": selected_profile["tannins_scld"][0],
+                "sweetness": selected_profile["sweetness_scld"][0],
+                "acidity": selected_profile["acidity_scld"][0]
             },
             "weights": self.weights
         }
 
         return user_input
 
+
+    def _build_pairing_profile(self, quantiles=[0, .25, .5, .75, 1]) -> Tuple[Dict, Dict]:
+        """
+        Crea los perfiles de sabor por cuantiles por pairing.
+            - Objetivo -> que haga sentido el perfil elegido con el seleccionado por el user.
+
+        Args:
+            - quantiles -> Lista con cuantiles a considerar.
+
+        Returns:
+            - profile -> Diccionario con cuantiles por sabor y pairing.
+            - deviations -> Diccionario con desvíos estándar por sabor y pairing.
+        """
+        profiles = {}
+        deviations = {}
+        for pairing in self.pairing_cols:
+            pairing_subset = self.tra_df[self.tra_df[pairing] == 1]
+            profiles[pairing] = {}
+            deviations[pairing] = {}
+            for taste in self.taste_cols_scld:
+                # Cuantiles
+                taste_quantile = pairing_subset[taste].quantile(quantiles)
+                profiles[pairing][taste] = taste_quantile
+
+                # Desvío Estandar (para distribución normal en select_taste_profile)
+                std = pairing_subset[taste].std()
+                deviations[pairing][taste] = std
+
+        return profiles, deviations
     
-    # 01. ELECCIÓN DE COMIDA #
 
     def _select_random_meal(self) -> Dict[str, object]:
         """
@@ -129,38 +159,6 @@ class SyntheticUserSimulator:
             "main_pairing": main_pairing,
             "pairing_list": pairing_list
         }
-
-
-    # 02. ELECCIÓN DE PERFIL DE SABOR #
-
-    def _build_pairing_profile(self, quantiles=[0, .25, .5, .75, 1]) -> Tuple[Dict, Dict]:
-        """
-        Crea los perfiles de sabor por cuantiles por pairing.
-            - Objetivo -> que haga sentido el perfil elegido con el seleccionado por el user.
-
-        Args:
-            - quantiles -> Lista con cuantiles a considerar.
-
-        Returns:
-            - profile -> Diccionario con cuantiles por sabor y pairing.
-            - deviations -> Diccionario con desvíos estándar por sabor y pairing.
-        """
-        profiles = {}
-        deviations = {}
-        for pairing in self.pairing_cols:
-            pairing_subset = self.wine_df[self.wine_df[pairing] == 1]
-            profiles[pairing] = {}
-            deviations[pairing] = {}
-            for taste in self.taste_cols:
-                # Cuantiles
-                taste_quantile = pairing_subset[taste].quantile(quantiles)
-                profiles[pairing][taste] = taste_quantile
-
-                # Desvío Estandar (para distribución normal en select_taste_profile)
-                std = pairing_subset[taste].std()
-                deviations[pairing][taste] = std
-
-        return profiles, deviations
     
     
     def _select_taste_profile(self, main_pairing: str, prob: float = 0.2,
@@ -178,7 +176,7 @@ class SyntheticUserSimulator:
         - Diccionario con el gusto preferido por cada variable de sabor (body, sweetness, etc.)
         """
         selected_profile = {}
-        for taste in self.taste_cols:
+        for taste in self.taste_cols_scld:
             quantiles = self._taste_profiles[main_pairing][taste]
             std = self._taste_deviations[main_pairing][taste]
 
@@ -190,7 +188,6 @@ class SyntheticUserSimulator:
                 ]
                 selected_val = np.random.choice(quant_random_options)
             else:
-                # Elección según distribución normal del sabora para el pairing seleccionado
                 median = quantiles[.5]
                 min_val = quantiles[0]
                 max_val = quantiles[1]
@@ -227,7 +224,7 @@ class SyntheticUserSimulator:
         
         # Gestiona valores atípicos (mayores que el máximo valor de los cuantiles)
         if value >= quant_values[-1]:
-            return categories[-1], [quant_values[-2], quant_values[-1]]
+            return quant_values[-1], [quant_values[-2], quant_values[-1]]
         
         # Gestiona valores atípicos (menores que el mínimo valor de los cuantiles)
         if 0 <= value < quant_values[0]:
@@ -237,12 +234,10 @@ class SyntheticUserSimulator:
         raise ValueError(f"Passed value is less than zero! {value}")
 
 
-    # 03. ELECCIÓN DE UVAS #
-
     def _select_grapes(self,
                        top_n_grapes: int = 8,
                        min_grapes: int = 1,
-                       max_grapes: int = 8) -> List[str]:
+                       max_grapes: int = 4) -> List[str]:
         """
         Selecciona aleatoriamente un set de uvas según su frecuencia en el dataset.
 
@@ -254,17 +249,14 @@ class SyntheticUserSimulator:
         Returns:
             - Lista de uvas seleccionadas.
         """
-        # Obtiene las uvas más frecuentes y el total de uvas del dataset
         grapes_df = self.wine_df[self.grape_cols]
         top_grapes = self._get_top_grapes(grapes_df, top_n_grapes)
         total_grapes_in_df = sum(grapes_df.sum(axis=0))
 
-        # Calcula la probabilidad de encontrarse cada uva + otras uvas de forma agrupada
         top_grapes_prob = top_grapes / total_grapes_in_df
         top_grapes_prob["Otras Uvas"] = 1 - sum(top_grapes_prob)
         grapes_prob = dict(top_grapes_prob)
 
-        # Elección de uvas siguiendo la probabilidad de encontrarlas en el dataset
         while True:
             grape_selection = [grape for grape, prob in grapes_prob.items() if random.random() < prob]
             if len(grape_selection) >= min_grapes:
@@ -286,31 +278,6 @@ class SyntheticUserSimulator:
         """
         top_grapes = grapes_df.sum(axis=0).sort_values(ascending=False).head(top_n_grapes)
         return top_grapes
-    
-
-    def _df_group_other_grapes(self, df: pd.DataFrame, top_n_grapes: int = 8, drop: bool = True) -> pd.DataFrame:
-        """
-        Agrega agrupa todas las uvas que no son 'top wines' en la columna 'Otras Uvas'.
-        
-        Args:
-            - df -> el DataFrame con las columnas de uvas a agrupar.
-            - top_n_grapes -> número de uvas más frecuentes no agrupadas en 'Otras Uvas'.
-            - drop -> determina si dropea las columnas agrupadas en 'Otras Uvas' (default True).
-
-        Returns:
-            - Dataframe con uvas fuera del top_n_wines agrupadas en la columna 'Otras Uvas'.
-        """
-        tra_df = df.copy()
-        grapes_df = tra_df[self.grape_cols]
-        top_grapes = list(self._get_top_grapes(grapes_df, top_n_grapes).index)
-        other_grapes = [grape for grape in self.grape_cols if grape not in top_grapes]
-        tra_df["Otras Uvas"] = tra_df[other_grapes].max(axis=1)
-        if drop:
-            tra_df = tra_df.drop(columns=other_grapes)
-        return tra_df
-    
-
-    # 04. ELECCIÓN DE PRECIO #
 
     def _select_price_range(
             self,
@@ -334,9 +301,9 @@ class SyntheticUserSimulator:
         # Eliminación de outliers (IQR * 1.5)
         no_outlier_price = ut.manage_outlier_IQR(df["price"], func="remove")
         price_quantiles = no_outlier_price.quantile(quantiles)
-        
+
         # Adición de extremos (sin precio mínimo / máximo)
-        price_quantiles[0], price_quantiles[1] = 1, -1
+        price_quantiles[0], price_quantiles[1] = 0, -1
         price_quantiles = price_quantiles.sort_index()
         price_quantiles = pd.Series(price_quantiles.values)
 
@@ -358,179 +325,104 @@ class SyntheticUserSimulator:
             price_range[1] = None
 
         return price_range
-    
 
-    # ============================= #
-    # ↓↓↓ CÁLCULO DE WINE SCORE ↓↓↓ #
-    # ============================= #
 
-    # 01. PRICE QUALITY
-
-    def _calc_qual_price_score(
-            self,
-            rating: float,
-            price: float,
-            user_min_price: float,
-            user_max_price: Union[float, None],
-            rating_threshold: float = 4.0,
-            price_sensitivity: float = 1.0
-    ) -> float:
+    def _transform_df(self) -> Tuple[pd.DataFrame, List]:
         """
-        Calcula un score de precio-calidad basado en la percepción del usuario.
-
-        La función combina dos componentes principales:
-        1. Componente de Calidad: Normaliza el rating respecto al threshold aceptable
-        2. Componente de Precio: Evalúa la percepción del precio según el rango del usuario
-
-        Lógica del Componente de Precio:
-        - Precio < mínimo: Penalización fuerte (posible baja calidad percibida)
-        - Sin precio límite superior: Penalización logarítmica creciente desde el mínimo
-        - Con límite superior: Score óptimo en el medio del rango, penalización muy fuerte fuera
-        
-        La función logarítmica (sin límite superior) simula percepción psicológica:
-        - Precio = mínimo usuario: Score neutral (0)
-        - Precio 2x mayor: Penalización moderada (-0.693)
-        - Precio 4x mayor: Penalización fuerte (-1.386)
-        - La penalización crece más lentamente que el precio (curva logarítmica)
-        
-        El score final combina ambos componentes, dándole un peso de 1 para calidad y
-        0.5 para precio, y se aplica función sigmoid para normalizar entre 0-1.
-        
-        Args:
-            - rating -> Rating del vino (0-5).
-            - price -> Precio del vino.
-            - user_min_price -> Precio mínimo que el usuario está dispuesto a pagar.
-            - user_max_price -> Precio máximo que el usuario está dispuesto a pagar (None = sin límite).
-            - rating_threshold -> Umbral del rating considerado "aceptable".
-            - price_sensitivity -> Sensibilidad del usuario al precio.
-                
-        Returns:
-            - Score de precio-calidad (0-1, valores más altos = mejor percepción)
-        """
-        # 1. Componente de Calidad (rating normalizado respecto al threshold)
-        quality_component = rating - rating_threshold
-
-        # 2. Componente de Precio (percepción relativa al rango del usuario)
-        if price < user_min_price:
-            price_component = -2 * (user_min_price - price) / user_min_price
-        elif user_max_price is None:
-            price_ratio = price / user_min_price
-            price_component = -np.log(price_ratio) * price_sensitivity
-        else:
-            if price > user_max_price:
-                price_component = -3 * (price - user_max_price) / user_max_price
-            else:
-                price_range = user_max_price - user_min_price
-                normalized_position = (price - user_min_price) / price_range
-                # Función cuadrática invertida: máximo en 0.5
-                # (precio del vino en medio del rango del usuario)
-                price_component = 1 - 4 * (normalized_position - 0.5) ** 2
-
-        score = quality_component + price_component * .5
-        sig_score = ut.sigmoid(score, center=0, steepness=3)
-        return sig_score
-
-
-    # 02. WINE POPULARITY
-
-    def _calc_popularity_score(self, rating_qty):
-        """
-        Calcula un puntaje de popularidad para un rating_qty datdo, basándose en un threshold fijo.
-
-        Args:
-            - rating_qty -> cantidad de ratings del vino
+        Pre-transforma el DataFrame para la simulación.
 
         Returns:
-            - Puntaje de popularidad (0.0 - 1.0).
+        - DataFrame con:
+            1. Tastes escalados (body, tannins, etc.)
+            2. Columna "Otras Uvas".
+            3. Métrica de calidad-precio global.
+        - Lista con nombre de columnas de sabor escaladas.
         """
-        if rating_qty >= 1000: return 1.0
-        if rating_qty >= 700: return 0.9
-        if rating_qty >= 500: return 0.8
-        if rating_qty >= 400: return 0.7
-        if rating_qty >= 300: return 0.6
-        if rating_qty >= 200: return 0.5
-        if rating_qty >= 150: return 0.4
-        if rating_qty >= 100: return 0.3
-        if rating_qty >= 70: return 0.2
-        if rating_qty >= 40: return 0.1
-        else: return 0
+        tra_df = self.wine_df.copy()
+        tra_df, taste_cols_scld = self._df_add_scaled_tastes(tra_df)  # Escala tastes
+        tra_df = self._df_group_other_grapes(tra_df)                  # Agrupa Otras Uvas
+        tra_df = self._df_add_qual_price(tra_df)                      # Agrega Métrica Calidad-Precio
+        return tra_df, taste_cols_scld
 
 
-    # 03. USER SIMILARITY
-
-    def _df_add_user_similarity(self, df: pd.DataFrame, tastes: Dict, slope_factor: float = 0.1) -> np.array:
+    def _df_add_scaled_tastes(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List]:
         """
-        Agrega columna de similitud entre el gusto de vino y el input del usuario al df.
+        Escala columnas de sabor del dataframe (body, tannins, etc.)
 
         Args:
-            - df -> Dataframe al que agregar la columna 'user_similarity'.
-            - tastes -> Diccionario con gustos y preferencias del usuario.
-            - slope_factor -> Pendiete que determina que tan estricta es la diferencia entre los sabores del user y el vino (más alta, más estricta).
+            - df -> DataFrame con las columnas taste a escalar.
 
         Returns:
-            - Dataframe con columna 'user_similarity' agregada.
+            - DataFrame con columnas de sabor Min-Max scaled (sufijo '_scld').
+            - Lista con nombres de columnas de sabor escaladas.
         """
-        # Obtención de subset de tastes
         tra_df = df.copy()
-        tastes_df = tra_df[self.taste_cols]
+        taste_cols_scld = [taste + "_scld" for taste in self.taste_cols]
+        tra_df[taste_cols_scld] = self.mm_scaler.fit_transform(tra_df[self.taste_cols])
+        return tra_df, taste_cols_scld
 
-        # Cálculo de similarity por cada vino (registro)
-        similarities = []
-        for _, row in tastes_df.iterrows():
-            wine_similarity = 0
-            col_count = 0
-            # Calculo de Fuzzy Smooth Similarity de cada taste (columna)
-            for col_name in tastes_df.columns:
-                if col_name in tastes:
-                    value = row[col_name]
-                    q_low, q_high = tastes[col_name]
-                    wine_similarity += self._fuzzy_smooth_similarity(value, q_low, q_high, slope_factor)
-                    col_count += 1
-            
-            # Cálculo del promedio de similitudes
-            avg_similarity = wine_similarity / col_count if col_count > 0 else None
-            similarities.append(avg_similarity)
+    def _df_group_other_grapes(self, df: pd.DataFrame, top_n_grapes: int = 8, drop: bool = True) -> pd.DataFrame:
+        """
+        Agrega agrupa todas las uvas que no son 'top wines' en la columna 'Otras Uvas'.
+        
+        Args:
+            - df -> el DataFrame con las columnas de uvas a agrupar.
+            - top_n_grapes -> número de uvas más frecuentes no agrupadas en 'Otras Uvas'.
+            - drop -> determina si dropea las columnas agrupadas en 'Otras Uvas' (default True).
 
-        # Asignación de similarities a columna en df y return del df
-        tra_df["user_similarity"] = similarities
+        Returns:
+            - Dataframe con uvas fuera del top_n_wines agrupadas en la columna 'Otras Uvas'.
+        """
+        tra_df = df.copy()
+        grapes_df = tra_df[self.grape_cols]
+        top_grapes = list(self._get_top_grapes(grapes_df, top_n_grapes).index)
+        other_grapes = [grape for grape in self.grape_cols if grape not in top_grapes]
+        tra_df["Otras Uvas"] = tra_df[other_grapes].max(axis=1)
+        if drop:
+            tra_df = tra_df.drop(columns=other_grapes)
         return tra_df
 
-
-    def _fuzzy_smooth_similarity(
-        self,
-        value: Union[float, int],
-        q_low: Union[float, int],
-        q_high: Union[float, int],
-        slope_factor: float = 0.1
-    ) -> Union[float, int]:
+    
+    # Se aplica 2 veces: 1) Global, 2) Local (por cada user)
+    def _df_add_qual_price(self, df: pd.DataFrame) -> pd.DataFrame:
+        # https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.RobustScaler.html
         """
-        Calcula la Fuzzy Distance entre un valor y el rango de valores dados.
+        Agrega métricas de precio calidad al DataFrame.
 
         Args:
-            - value -> valor del gusto del usuario.
-            - q_low -> límite inferior del rango del gusto.
-            - q_high -> límite superior del rango del gusto.
-            - slope_factor -> parámetro que determina la pendiente de la f(x) de similitud del vino y las preferencias del usuario.
-
-        Return:
-            - Valor de Fuzzy Similarity entre el valor y el rango ingresado con caida suave (Smooth).
+            df -> DataFrame al cual agregar métricas de precio calidad.
+        
+        Returns:
+            - DataFrame con nuevas columnas:
+                - rating_rscld -> rating con escalado robusto.
+                - price_rscld -> precio con escalado robusto.
+                - quality_price -> diferencia entre rating y precio escalados.
+                - quality_price_rscld -> métrica de precio calidad entre 0 y 1 con escalado robusto.
         """
-        if q_low <= value <= q_high:
-            # Máxima similitud dentro del rango de sabor
-            return 1.0
-        elif value < q_low:
-            # Distancia contra límite inferior
-            edge_distance = q_low - value
-        else:
-            # Distancia contra límite superior
-            edge_distance = value - q_high
+        tra_df = df.copy()
+        # Cálculo de zscore para rating y price (mediana = 0, std = 1)
+        rscaler = self.robust_scaler
+        tra_df[['rating_rscld', 'price_rscld']] = rscaler.fit_transform(tra_df[["rating", "price"]])
+                
+        # Cálculo de métrica calidad-precio (calidad suma, precio resta)
+        tra_df["quality_price"] = tra_df['rating_rscld'] - tra_df['price_rscld']
+        
+        # Escalado robusto con outliers fuera del fit, pero incluidos en el transform 
+        # (Limita los outliers a IQR * 2, pone un límite de 0 y 1)
+        no_outliers = ut.manage_outlier_IQR(
+            tra_df['quality_price'], i=2, func="remove"
+        )
 
-        # Similarity = 1 - smooth_distance
-        smooth_distance = edge_distance / (edge_distance + slope_factor)
-        return 1 - smooth_distance
-    
+        mod_mm_scaler = self.mm_scaler.fit(no_outliers.to_frame())
 
-    # 04. CÁLCULO DE PUNTAJE DE VINOS
+        # TODO: agregar visualización de distribución en el EDA
+
+        # Límite de quality price en 0 y 1 (capear los outliers)
+        scld_qual = np.clip(mod_mm_scaler.transform(tra_df[["quality_price"]]), a_min=0, a_max=1)
+        tra_df["quality_price_rscld"] = scld_qual
+
+        return tra_df
+
 
     def _score_wines(self, df: pd.DataFrame, user_input: Dict) -> pd.DataFrame:
         """
@@ -543,77 +435,127 @@ class SyntheticUserSimulator:
         Returns:
             - DataFrame con vinos, sus scores y sus scores escalados.
         """
-        # Copia del df original
         tra_df = df.copy()
 
-        # Cálculo de precio calidad del vino según input del usuario
-        user_min_price = user_input["precio_min"]
-        user_max_price = user_input["precio_max"]
-        tra_df["price_quality"] = tra_df.apply(
-            lambda row: self._calc_qual_price_score(
-                rating=row["rating"],
-                price=row["price"],
-                user_min_price=user_min_price,
-                user_max_price=user_max_price,
-                rating_threshold=4.0,
-                price_sensitivity=1
-            ),
-            axis=1
-        )
-
-        # Cálculo de popularidad del vino
-        tra_df["wine_popularity"] = tra_df["rating_qty"].apply(lambda x: self._calc_popularity_score(rating_qty=x))
-
-        # Cálculo de "user_similarity" de gustos del user contra cada vino
+        # Cálculo de similitud de gustos del user contra cada vino
         user_tastes = user_input["tastes"]
-        tra_df = self._df_add_user_similarity(df=tra_df, tastes=user_tastes, slope_factor=0.1)
+        tra_df = self._df_add_user_similarity(tra_df, user_tastes)
 
         # Obtención de weights
         user_weights = user_input["weights"]
         rating_w = user_weights["rating"]
         price_quality_w = user_weights["price_quality"]
-        wine_popularity_w = user_weights["wine_popularity"]
+        rating_qty_w = user_weights["rating_qty"]
         user_similarity_w = user_weights["user_similarity"]
         main_pairing_w = user_weights["main_pairing"]
 
         # Puntaje sintético del vino
         tra_df["wine_score"] = (
             rating_w * (tra_df["rating"] / 5) + 
-            price_quality_w * tra_df["price_quality"] + 
-            wine_popularity_w * tra_df["wine_popularity"] +
+            price_quality_w * tra_df["quality_price_rscld"] + 
+            rating_qty_w * (tra_df["rating_qty"] / tra_df["rating_qty"].max()) +
             user_similarity_w * tra_df["user_similarity"] + 
             main_pairing_w * tra_df[user_input["main_pairing"]]
         )
 
-        # Dropeo de columnas utilizadas para el cálculo
-        tra_df = tra_df.drop(columns=["price_quality", "wine_popularity", "user_similarity"])
+        # Min-Max Scaling del score
+        tra_df["wine_score_scld"] = self.mm_scaler.fit_transform(tra_df[["wine_score"]])
 
         return tra_df
+
+
+    def _df_add_user_similarity(self, df: pd.DataFrame, tastes: Dict) -> pd.DataFrame:
+        """
+        Agrega columna de similitud con el input del usuario al df.
+
+        Args:
+            - df -> Dataframe al que agregar la columna 'user_similarity'
+            - tastes -> Diccionario con gustos y preferencias del usuario.
+
+        Returns:
+            - Dataframe con columna 'user_similarity' agregada.
+        """
+
+        tra_df = df.copy()
+        # Calcula la similitud con los gustos del usuario con Fuzzy Distance
+        distances = self._compute_fuzzy_distance(tra_df[self.taste_cols_scld], tastes)
+        tra_df["user_similarity"] = 1 - (distances / distances.max())
+        tra_df["taste_distance_raw"] = distances
+        return tra_df
+        
+
+    def _compute_fuzzy_distance(self, tastes_df: pd.DataFrame, tastes: Dict) -> np.array:
+        """
+        Computa la distancia tipo fuzzy entre los gustos del usuario y los vinos disponibles.
+
+        Args:
+        - tastes_df -> DataFrame de columnas taste escaladas.
+        - tastes -> Diccionario con gustos y preferencias del usuario.
+
+        Returns:
+        - Numpy Array con las distancias entre cada registro del DataFrame y los gustos del usuario.
+        """
+        # Cálculo de distancias por cada vino (registro)
+        distances = []
+        for _, row in tastes_df.iterrows():
+            wine_distance = 0
+            col_count = 0
+            # Calculo de Fuzzy Distance de cada taste (columna)
+            for col in tastes_df.columns:
+                key = col.replace("_scld", "")
+                if key in tastes:
+                    value = row[col]
+                    q_low, q_high = tastes[key]
+                    wine_distance += self._fuzzy_distance(value, q_low, q_high)
+                    col_count += 1
+            
+            # Cálculo del promedio de distancias
+            distance = wine_distance / col_count if col_count > 0 else None
+            distances.append(distance)
+
+        distances = np.array(distances)
+        return distances
     
 
-    # =============================== #
-    # ↓↓↓ COMPORTAMIENTO DEL USER ↓↓↓ #
-    # =============================== #
+    def _fuzzy_distance(self, value: Union[float, int], q_low: Union[float, int], q_high: Union[float, int]) -> Union[float, int]:
+        """
+        Calcula la Fuzzy Distance entre un valor y el rango de valores dados.
 
-    # 01. ELECCIÓN DEL VINO
+        Args:
+            - value -> valor del gusto del usuario.
+            - q_low -> límite inferior del rango del gusto.
+            - q_high -> límite superior del rango del gusto.
+
+        Return:
+            - Valor de la Fuzzy Distance entre el valor y el rango ingresado.
+        """
+        # Distancia escalada contra límite inferior
+        if value < q_low:
+            return (q_low - value) / (q_high - q_low)
+        # Distancia escalada contra límite superior
+        elif value > q_high:
+            return (value - q_high) / (q_high - q_low)
+        # Valor dentro del rango (distancia = 0)
+        else:
+            return 0.0
+
 
     def simulate_user_choice(
-            self, scored_df: pd.DataFrame, user_input: Dict, top_n: int=50, d: float=.05
+            self, scored_df: pd.DataFrame, user_input: Dict, top_n: int=20, d: float=.075
         ) -> Union[Dict[str, Union[pd.Series, pd.DataFrame]], None]:
         """
-        Elige un vino de los top_n vinos con mayor score.
+        Elige los top_n vinos con mayor score.
 
         Parameters:
-            - scored_df -> DataFrame con vinos, sus scores y uvas agrupadas.
-            - user_input -> Diccionario con selección de parámetros del usuario.
-            - top_n -> Cantidad de vinos con mejor puntaje entre los que elije el user.
-            - d -> Decrecimiento en probabilidad de elegir el siguiente vino con peor puntaje.
+            - scored_df -> DataFrame con vinos y sus scores globales calculados.
+            - user_input -> Diccionario con selección del usuario.
 
         Returns:
             - Diccionario con:
                 - selected_wine -> Serie del vino elegido.
                 - user_choices -> DataFrame con la elección posible del usuario.
                 - user_wine_base -> DataFrame con todos los vinos filtrados por el usuario.
+                - global_wine_base -> DataFrame con todos los vinos disponibles.
         """
         # User Inputs
         user_pairings = user_input.get("pairing_list")
@@ -622,69 +564,144 @@ class SyntheticUserSimulator:
         grape_list = user_input.get("grape_list")
         user_tastes = user_input.get("tastes")
 
-        wine_base = scored_df.copy()
-        
+        # Renombramiento de variables del scored_df como Globales (consideran toda la data)
+        wine_base = self._rename_repeated_cols(df=scored_df, sufix="gbl") # Base utilizada para cálculo local ("por user")
+        wine_base_gbl = wine_base.copy() # Copia global
+
         # Filtro por pairings
         if user_pairings is not None:
-            pairing_filtered = wine_base[wine_base[user_pairings].sum(axis=1)>0]
-            if len(pairing_filtered) > 0:
-                wine_base = pairing_filtered
+            wine_base = wine_base[wine_base[user_pairings].sum(axis=1)>0]
 
         # Filtro por precio
         if precio_min is not None:
-            precio_min_filtered = wine_base[wine_base["price"]>=precio_min]
-            if len(precio_min_filtered) > 0:
-                wine_base = precio_min_filtered
+            wine_base = wine_base[wine_base["price"]>=precio_min]
         if precio_max is not None:
-            precio_max_filtered = wine_base[wine_base["price"]<=precio_max]
-            if len(precio_max_filtered) > 0:
-                wine_base = precio_max_filtered
+            wine_base = wine_base[wine_base["price"]<=precio_max]
         
         # Filtro por uvas
         if grape_list is not None:
-            grape_filtered = wine_base[wine_base[grape_list].sum(axis=1)>0]
-            if len(grape_filtered) > 0:
-                wine_base = grape_filtered
+            wine_base = wine_base[wine_base[grape_list].sum(axis=1)>0]
 
-        # Selección de uno de los mejores top_n vinos
-        top_wine_base = wine_base.nlargest(top_n, "wine_score")
-        top_selection_weights = [(1 - d)**n for n in range(len(top_wine_base))]    # Pesos decrecientes de a d%
-        top_selection_weights = [w*random.random() for w in top_selection_weights] # Agregamos factor aleatorio
-        total_weight = sum(top_selection_weights)
-        top_selection_weights = [w / total_weight for w in top_selection_weights]  # Normalizamos para interpretabilidad
-        selected_wine_id = int(random.choices(top_wine_base.index, top_selection_weights, k=1)[0]) # Selección de 1 vino según vector de pesos
-        selected_wine = wine_base.loc[selected_wine_id] # Localización de vino por id en la base de vinos
-        return {
-            "selected_wine": selected_wine,
-            "user_choices": top_wine_base,
-            "user_wine_base": wine_base
-        }
+        # Solo se ejecuta si existen vinos para la selección del usuario
+        if len(wine_base) > 0:
+            # Quality/price local
+            wine_base = self._df_add_qual_price(wine_base)
+
+            # TODO: Quitar redundancia de cálculo de similaridad y wine_score
+            # User similarity (Fuzzy Distance) local
+            wine_base = self._df_add_user_similarity(wine_base, user_tastes)
+
+            # Puntaje sintético local del vino
+            wine_base = self._score_wines(wine_base, user_input) # Puntaje "crudo"
+
+            if len(wine_base) > max(top_n//2, 10):
+                # Si el wine_base es lo suficientemente grande, el puntaje es escalado considerando la selección de filtros del usuario
+                wine_base["wine_score_scld"] = self.mm_scaler.fit_transform(wine_base[["wine_score"]])
+            else:
+                # Si el wine_base es pequeño, se considera el wine_score global (sin filtros de usuario)
+                if wine_base.index.isin(wine_base_gbl.index).all():
+                    wine_base["wine_score_scld"] = wine_base_gbl.loc[wine_base.index]["wine_score_scld_gbl"]
+                else:
+                    raise IndexError("Index in wine_base and global dataframe passed doesn't match!")
 
 
-    # 02. LIKE/DISLIKE DEL VINO
+            # Selección de uno de los mejores top_n vinos
+            top_wine_base = wine_base.nlargest(top_n, "wine_score")
+            top_selection_weights = [(1 - d)**n for n in range(len(top_wine_base))]    # Pesos decrecientes de a d%
+            top_selection_weights = [w*random.random() for w in top_selection_weights] # Agregamos factor aleatorio con suma positiva
+            total_weight = sum(top_selection_weights)
+            top_selection_weights = [w / total_weight for w in top_selection_weights]  # Normalizamos para interpretabilidad
+            selected_wine_id = int(random.choices(top_wine_base.index, top_selection_weights, k=1)[0]) # Selección de 1 vino según vector de pesos
+            selected_wine = wine_base.loc[selected_wine_id] # Localización de vino por id en la base de vinos
+            return {
+                "selected_wine": selected_wine,
+                "user_choices": top_wine_base,
+                "user_wine_base": wine_base,
+                "global_wine_base": wine_base_gbl
+            }
+        # Se ejecuta si no existen vinos para la selección del usuario
+        else:
+            logging.info("No wines match user input!")
+            return None
 
+
+    def _rename_repeated_cols(self, df: pd.DataFrame, cols_to_rename: List[str]=None, sufix: str="gbl"):
+        """
+        Renombra las columnas repetidas entre el DataFrame con todos los vinos y tras aplicarle filtros del usuario.
+
+        Args:
+            - df -> DataFrame a renombrar.
+            - cols_to_rename -> columnas del DataFrame a las que agregar el sufijo.
+            - sufix -> sufijo a agregarle a las columnas del DataFrame.
+
+        Returns:
+            - DataFrame con columnas renombradas.
+        """
+        if cols_to_rename is None:
+            cols_to_rename = [
+                'rating_rscld',
+                'price_rscld',
+                'quality_price',
+                'quality_price_rscld',
+                'user_similarity',
+                'taste_distance_raw',
+                'wine_score',
+                'wine_score_scld'
+            ]
+        renamed_cols = [f"{col_name}_{sufix}" for col_name in cols_to_rename]
+        renaming_dict = dict(zip(cols_to_rename, renamed_cols))
+        renamed_df = df.rename(columns=renaming_dict).copy()
+        return renamed_df
+
+    
     def simulate_like(
             self,
+            global_df_scored: pd.DataFrame,
             selected_wine: pd.Series,
-            noise_std: float=.05
+            global_score_name: str="wine_score_scld_gbl",
+            local_score_name: str="wine_score_scld",
+            alpha: float=.5,
+            beta: float=.5,
+            desv: float=.05
         ) -> int:
         """
         Simula si al usuario le gustó o no el vino recomendado.
 
         Args:
+            - global_df_scored -> DataFrame que contiene el global score escalado.
             - selected_wine -> series con el wine seleccionado.
-            - noise_std -> desvío estandar del factor aleatorio con distribución normal que se le agrega al wine_score.
+            - global_score_name -> nombre de la columna con el wine score global.
+            - local_score_name -> nombre de la columna con el wine score local.
+            - alpha -> multiplica la diferencia entre el score global y el local cuando es positiva.
+            - beta -> multiplica la diferencia entre el score global y el local cuando es negativa.
+            - desv -> desvío estandard del factor aleatorio con distribución normal y media = 0, que se le suma a la probabilidad de que le guste el vino al usuario.
 
         Returns:
             - liked -> 1 o 0 de acuerdo a si al usuario le gustó o no el vino.
-            - prob_like -> probabilidad de que al usuario el guste el vino (0.0 - 1.0).
+            - prob_like -> probabilidad estimada de que al usuario el guste el vino.
         """
-        wine_score = selected_wine["wine_score"]
-        prob_like = np.clip(wine_score + np.random.normal(0, noise_std), 0.0, 1.0)
-        return int(prob_like > random.random()), prob_like
+        global_score_norm = global_df_scored.loc[selected_wine.name][global_score_name]
+        local_score_norm = selected_wine[local_score_name]
+        desvio_score = global_score_norm - local_score_norm
+        ajuste = 0
 
+        if desvio_score > 0: # El vino es mejor globalmente de lo que aparenta ser localmente
+            ajuste = desvio_score * alpha
+        elif desvio_score < 0: # El vino es peor globalmente de lo que aparenta ser localmente
+            ajuste = desvio_score * beta
+        else: # El vino es igual de bueno global y localmente
+            ajuste = 0
 
-    # 03. EVALUACIÓN, COMPRA Y LIKE/DISLIKE DEL VINO
+        prob_like = local_score_norm + ajuste + np.random.normal(0, desv) # Score ajustado con factor random
+        prob_like = min(max(prob_like, 0),.99)
+        random_prob = random.random()
+        liked = 0
+
+        if random_prob < prob_like:
+            liked = 1
+
+        return liked, prob_like
+
 
     def simulate_user_behaviour(
             self,
@@ -725,10 +742,11 @@ class SyntheticUserSimulator:
         user_data = None
         
         # Simulación de comportamiento de usuario
-        user_input = self.generate_user_input()                             # Input del usuario
-        tra_df = self._df_group_other_grapes(df=self.wine_df)               # Agregado de Otras Uvas
-        tra_df = self._score_wines(df=tra_df, user_input=user_input)        # Evaluación de vinos
-        user_choice_pack = self.simulate_user_choice(tra_df, user_input)    # Elección de vino
+        user_input = self.generate_user_input()
+        tra_df = self.tra_df
+        tra_df = self._df_add_qual_price(tra_df)
+        tra_df = self._score_wines(tra_df, user_input)
+        user_choice_pack = self.simulate_user_choice(tra_df, user_input)
 
         # Asignación de timestamp
         # https://docs.python.org/3/library/datetime.html#timedelta-objects
@@ -750,25 +768,28 @@ class SyntheticUserSimulator:
                 "user_id": user_id,
                 "wine_id": None,
                 "user_input": user_input,
+                "metrics_local": None,
+                "metrics_global": None,
                 "liked": None,
                 "prob_like": None
             }
         else:
             selected_wine = user_choice_pack["selected_wine"]
-            liked, prob_like = self.simulate_like(selected_wine)            # Like del vino
+            tra_df = user_choice_pack["global_wine_base"]
+            liked, prob_like = self.simulate_like(tra_df, selected_wine)
             user_data = {
                 "event_timestamp": timestamp,
                 "user_id": user_id,
                 "wine_id": int(selected_wine.name),
                 "user_input": user_input,
+                "metrics_local": selected_wine["rating_rscld":],
+                "metrics_global": selected_wine["rating_rscld_gbl":"wine_score_scld_gbl"],
                 "liked": liked,
                 "prob_like": prob_like
             }
         
         return user_data
     
-
-    # 04. RECOMPRA DEL VINO
 
     def simulate_user_repurchases(
             self,
@@ -822,13 +843,8 @@ class SyntheticUserSimulator:
 
         
         return user_history
+
     
-
-    # ====================================== #
-    # ↓↓↓ GENERACIÓN DE DATOS SINTÉTICOS ↓↓↓ #
-    # ====================================== #
-
-
     # TODO: explorar @dataclass para no tener que pasar los mismos argumentos una y otra vez.
     def generate_synthetic_data(
             self,

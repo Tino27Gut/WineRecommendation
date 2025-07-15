@@ -105,7 +105,7 @@ from src.wine_recommender.models import mi_modelo
 ### Si necesitas agregar una librería:
 
 1. **Agrégala al `pyproject.toml`** en la lista `dependencies`
-2. **Ejecuta** `pip install -e .` otra vez
+2. **Ejecuta** `pip install -e .` otra vez (asegurate de tener activado el virtual environment)
 
 ### Ejemplo:
 ```toml
