@@ -257,8 +257,8 @@ def train_test_val_split(
         y: Union[pd.DataFrame, pd.Series],
         val_size: float,
         test_size: float,
-        random_state: Optional[int],
-        stratify: Optional[pd.Series]
+        stratify: Optional[pd.Series]=None,
+        random_state: Optional[int]=None
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
     """
     Hace un split de los datos en grupos train, validation y test
@@ -302,7 +302,7 @@ def train_test_val_split(
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
-def plot_learning_curves(
+def plot_performance_curves(
         X_train: Union[pd.DataFrame, pd.Series],
         X_val: Union[pd.DataFrame, pd.Series],
         y_train: Union[pd.DataFrame, pd.Series],
@@ -312,7 +312,7 @@ def plot_learning_curves(
         eco_score_dict: Dict[str, Union[float, int]]
     ) -> None:
     """
-    Genera gráficos con curvas de aprendizaje para cada parámetro y valor pasado.
+    Genera gráficos con curvas de performance para cada parámetro y valor pasado.
 
     Args:
         - X_train -> features para entrenar el modelo.

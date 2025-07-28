@@ -6,8 +6,8 @@ from models.synthetic_user import SyntheticUserSimulator
 from src.utils.utils import get_project_file_path
 
 # Parámetros de la simulación
-simulation_name = "simulation_12"
-n_users = 5000
+simulation_name = "simulation_13"
+n_users = 3000
 user_acq_start_date = datetime(2022,1,1)
 user_acq_end_date = datetime(2024,1,1)
 repurchases_allowed = True
@@ -33,10 +33,9 @@ grapes = pd.read_csv(get_project_file_path("src", "data", "processed", "aux", "g
 grapes = list(grapes["grapes"])                                                                     # Lista de uvas
 
 simulation_weights = {
-    "rating": .25,
-    "price_quality": .25,
-    "wine_popularity": .1,
-    "user_similarity": .3,
+    "price_quality": .4,
+    "wine_popularity": .15,
+    "user_similarity": .35,
     "main_pairing": .1
 }
 
@@ -67,3 +66,4 @@ data, params = user.generate_synthetic_data(
 pd.to_pickle(data, data_saving_path)
 pd.to_pickle(params, params_saving_path)
 print(f"Guardado en {data_saving_path}")
+
