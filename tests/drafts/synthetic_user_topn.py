@@ -12,9 +12,10 @@ default_grapes = list(default_grapes["grapes"])
 default_pairings = pd.read_csv(ut.get_project_file_path("src", "data", "processed", "aux", "pairings.csv"))    # DataFrames de pairings
 default_pairings = list(default_pairings["pairings"])
 default_weights = {
-    "price_quality": .4,
-    "wine_popularity": .15,
-    "user_similarity": .35,
+    "rating": .25,
+    "price_quality": .25,
+    "wine_popularity": .1,
+    "user_similarity": .3,
     "main_pairing": .1
 }
 
@@ -41,7 +42,7 @@ class SyntheticUserSimulator:
             - grape_cols -> Lista con nombre de las columnas a utilizar como uvas.
             - pairing_cols -> Lista con nombre de las columnas a utilizar como pairing.
             - taste_cols -> Lista con nombre de las columnas a utilizar como taste.
-            - weights -> Diccionario con pesos para cada componente del score (price_quality, rating_qty, user_similarity, main_pairing).
+            - weights -> Diccionario con pesos para cada componente del score (rating, price_quality, rating_qty, user_similarity, main_pairing).
             - top_n -> Cantidad máxima de vinos que el usuario considera para elegir uno.
         """
         self.meals_df = meals_df.copy()
@@ -371,8 +372,8 @@ class SyntheticUserSimulator:
             price: float,
             user_min_price: float,
             user_max_price: Union[float, None],
-            rating_threshold: float = 3.5,
-            price_sensitivity: float = 0.5
+            rating_threshold: float = 4.0,
+            price_sensitivity: float = 1.0
     ) -> float:
         """
         Calcula un score de precio-calidad basado en la percepción del usuario.
@@ -380,9 +381,6 @@ class SyntheticUserSimulator:
         La función combina dos componentes principales:
         1. Componente de Calidad: Normaliza el rating respecto al threshold aceptable
         2. Componente de Precio: Evalúa la percepción del precio según el rango del usuario
-
-        Lógica del Componente de Calidad:
-        - 
 
         Lógica del Componente de Precio:
         - Precio < mínimo: Penalización fuerte (posible baja calidad percibida)
@@ -410,53 +408,27 @@ class SyntheticUserSimulator:
             - Score de precio-calidad (0-1, valores más altos = mejor percepción)
         """
         # 1. Componente de Calidad (rating normalizado respecto al threshold)
-        if rating >= rating_threshold:
-            # Sigmoide: f(3.9) = 0, f(5.0) ≈ 1
-            normalized_x = (rating - rating_threshold) / (5.0 - rating_threshold)
-            sigmoid_value = 1 - np.exp(-4 * normalized_x)
-            quality_component = 0.25 + 0.75 * sigmoid_value # ajuste a mínimo 0.25
-        elif rating >= 3.0:
-            # Caída de 0 a -1 (pequeña al inicio, más grande al final)
-            t = (rating - 3.0) / (rating_threshold - 3.0)  # t va de 0 a 1
-            # Interpolar de -1 (en x=3.0) a 0.25 (en x=3.5)
-            quality_component = -1 + 1.25 * (1 - np.exp(-3 * t))
-        else:
-            # Lineal: f(3.0) = -1, f(1.0) = -2
-            quality_component = - 1
-
+        quality_component = rating - rating_threshold
 
         # 2. Componente de Precio (percepción relativa al rango del usuario)
         if price < user_min_price:
-            # Penaliza precios por debajo del mínimo
             price_component = -2 * (user_min_price - price) / user_min_price
         elif user_max_price is None:
-            # Condiciones si no hay precio máximo
-            if user_min_price <= 5:
-                # Si el precio mínimo es muy pequeño, el óptimo es un valor bajo
-                optimal_price = 7
-            else:
-                # Si el precio mínimo es razonable, el óptimo es el mínimo + 20%
-                optimal_price = user_min_price * 1.2
-
-            if price <= optimal_price:
-                # Crecimiento lineal entre user_min_price y optimal_price (0.25 a 1)
-                price_component = 0.25 + 0.75 * ( (price - user_min_price) / (optimal_price - user_min_price) )
-            else:
-                # Decrecimiento exponencial suave en valores superiores al precio óptimo (≈0.5 en user_min_price * 4)
-                price_component = optimal_price / (optimal_price + price_sensitivity * (price - optimal_price))
+            price_ratio = price / user_min_price
+            price_component = -np.log(price_ratio) * price_sensitivity
         else:
-            # Condiciones con precio máximo
             if price > user_max_price:
-                # Penaliza precios por encima del máximo
                 price_component = -3 * (price - user_max_price) / user_max_price
             else:
-                # Función cuadrática invertida con precio máximo y mínimo (óptimo en la mitad del rango - 0.25 a 1 a 0.25)
                 price_range = user_max_price - user_min_price
                 normalized_position = (price - user_min_price) / price_range
-                price_component = 0.25 + 0.75 * (1 - 4 * (normalized_position - 0.5) ** 2)
+                # Función cuadrática invertida: máximo en 0.5
+                # (precio del vino en medio del rango del usuario)
+                price_component = 1 - 4 * (normalized_position - 0.5) ** 2
 
-        score = np.clip(quality_component * 0.5 + price_component * 0.5, 0, 1)
-        return score
+        score = quality_component * 0.5 + price_component * 0.5
+        sig_score = ut.sigmoid(score, center=0, steepness=3)
+        return sig_score
 
 
     # 02. WINE POPULARITY
@@ -486,7 +458,7 @@ class SyntheticUserSimulator:
 
     # 03. USER SIMILARITY
 
-    def _df_add_user_similarity(self, df: pd.DataFrame, tastes: Dict, slope_factor: Union[float, int] = 13) -> np.array:
+    def _df_add_user_similarity(self, df: pd.DataFrame, tastes: Dict, slope_factor: float = 0.1) -> np.array:
         """
         Agrega columna de similitud entre el gusto de vino y el input del usuario al df.
 
@@ -512,7 +484,7 @@ class SyntheticUserSimulator:
                 if col_name in tastes:
                     value = row[col_name]
                     q_low, q_high = tastes[col_name]
-                    wine_similarity += self._fuzzy_smooth_similarity(value, q_low, q_high, slope_factor=slope_factor)
+                    wine_similarity += self._fuzzy_smooth_similarity(value, q_low, q_high, slope_factor)
                     col_count += 1
             
             # Cálculo del promedio de similitudes
@@ -529,7 +501,7 @@ class SyntheticUserSimulator:
         value: Union[float, int],
         q_low: Union[float, int],
         q_high: Union[float, int],
-        slope_factor: Union[float, int] = 13
+        slope_factor: float = 0.1
     ) -> Union[float, int]:
         """
         Calcula la Fuzzy Distance entre un valor y el rango de valores dados.
@@ -554,12 +526,9 @@ class SyntheticUserSimulator:
             edge_distance = value - q_high
 
         # Similarity = 1 - smooth_distance
-        # smooth_distance = edge_distance / (edge_distance + slope_factor)
-        # return 1 - smooth_distance
-
-        similarity = np.exp(-((slope_factor * edge_distance) ** 2))
-        return max(similarity, 0)
-
+        smooth_distance = edge_distance / (edge_distance + slope_factor)
+        return 1 - smooth_distance
+    
 
     # 04. CÁLCULO DE PUNTAJE DE VINOS
 
@@ -586,7 +555,8 @@ class SyntheticUserSimulator:
                 price=row["price"],
                 user_min_price=user_min_price,
                 user_max_price=user_max_price,
-                rating_threshold=4.0
+                rating_threshold=4.0,
+                price_sensitivity=1
             ),
             axis=1
         )
@@ -596,10 +566,11 @@ class SyntheticUserSimulator:
 
         # Cálculo de "user_similarity" de gustos del user contra cada vino
         user_tastes = user_input["tastes"]
-        tra_df = self._df_add_user_similarity(df=tra_df, tastes=user_tastes)
+        tra_df = self._df_add_user_similarity(df=tra_df, tastes=user_tastes, slope_factor=0.1)
 
         # Obtención de weights
         user_weights = user_input["weights"]
+        rating_w = user_weights["rating"]
         price_quality_w = user_weights["price_quality"]
         wine_popularity_w = user_weights["wine_popularity"]
         user_similarity_w = user_weights["user_similarity"]
@@ -607,6 +578,7 @@ class SyntheticUserSimulator:
 
         # Puntaje sintético del vino
         tra_df["wine_score"] = (
+            rating_w * (tra_df["rating"] / 5) + 
             price_quality_w * tra_df["price_quality"] + 
             wine_popularity_w * tra_df["wine_popularity"] +
             user_similarity_w * tra_df["user_similarity"] + 
@@ -626,26 +598,22 @@ class SyntheticUserSimulator:
     # 01. ELECCIÓN DEL VINO
 
     def simulate_user_choice(
-            self, scored_df: pd.DataFrame, user_input: Dict
-        ) -> Union[pd.Series, None]:
+            self, scored_df: pd.DataFrame, user_input: Dict, top_n: int=50, d: float=.05
+        ) -> Union[Dict[str, Union[pd.Series, pd.DataFrame]], None]:
         """
         Elige un vino de los top_n vinos con mayor score.
 
-        Args:
+        Parameters:
             - scored_df -> DataFrame con vinos, sus scores y uvas agrupadas.
             - user_input -> Diccionario con selección de parámetros del usuario.
+            - top_n -> Cantidad de vinos con mejor puntaje entre los que elije el user.
+            - d -> Decrecimiento en probabilidad de elegir el siguiente vino con peor puntaje.
 
         Returns:
-            - selected_wine -> Serie del vino elegido.
-
-        Nota:
-            Para evitar data leakage, la elección del vino se realiza de forma aleatoria
-            dentro del conjunto previamente filtrado por preferencias del usuario
-            (uvas, pairing, rango de precios). Variables como el rating y la cantidad
-            de ratings no se utilizan para condicionar esta selección. En cambio,
-            estas variables se usan únicamente para simular si el usuario 'likea'
-            o no el vino luego de probarlo, permitiendo mantener la independencia
-            entre inputs de simulación y entrenamiento del modelo.
+            - Diccionario con:
+                - selected_wine -> Serie del vino elegido.
+                - user_choices -> DataFrame con la elección posible del usuario.
+                - user_wine_base -> DataFrame con todos los vinos filtrados por el usuario.
         """
         # User Inputs
         user_pairings = user_input.get("pairing_list")
@@ -678,10 +646,21 @@ class SyntheticUserSimulator:
             if len(grape_filtered) > 0:
                 wine_base = grape_filtered
 
-        # Selección aleatoria de uno de los vinos filtrados
-        selected_wine_id = int(random.choices(wine_base.index, k=1)[0]) 
-        selected_wine = wine_base.loc[selected_wine_id]
-        return selected_wine, wine_base
+        # TODO: REEMPLAZAR ESTA LÓGICA CON OTRA DE ELECCIÓN ALEATORIA LEVEMENTE SESGADA A 
+        # TODO: MEJORES RATINGS Y/O PUPULARIDAD
+        # Selección de uno de los mejores top_n vinos
+        top_wine_base = wine_base.nlargest(top_n, "wine_score")
+        top_selection_weights = [(1 - d)**n for n in range(len(top_wine_base))]    # Pesos decrecientes de a d%
+        top_selection_weights = [w*random.random() for w in top_selection_weights] # Agregamos factor aleatorio
+        total_weight = sum(top_selection_weights)
+        top_selection_weights = [w / total_weight for w in top_selection_weights]  # Normalizamos para interpretabilidad
+        selected_wine_id = int(random.choices(top_wine_base.index, top_selection_weights, k=1)[0]) # Selección de 1 vino según vector de pesos
+        selected_wine = wine_base.loc[selected_wine_id] # Localización de vino por id en la base de vinos
+        return {
+            "selected_wine": selected_wine,
+            "user_choices": top_wine_base,
+            "user_wine_base": wine_base
+        }
 
 
     # 02. LIKE/DISLIKE DEL VINO
@@ -689,16 +668,14 @@ class SyntheticUserSimulator:
     def simulate_like(
             self,
             selected_wine: pd.Series,
-            noise_std: float=.05,
-            threshhold: float=0.5
-        ) -> Tuple[int, float]:
+            noise_std: float=.05
+        ) -> int:
         """
         Simula si al usuario le gustó o no el vino recomendado.
 
         Args:
             - selected_wine -> series con el wine seleccionado.
             - noise_std -> desvío estandar del factor aleatorio con distribución normal que se le agrega al wine_score.
-            - threshold -> determina la probabilidad que tiene que alcanzar un vino para ser gustado.
 
         Returns:
             - liked -> 1 o 0 de acuerdo a si al usuario le gustó o no el vino.
@@ -706,7 +683,7 @@ class SyntheticUserSimulator:
         """
         wine_score = selected_wine["wine_score"]
         prob_like = np.clip(wine_score + np.random.normal(0, noise_std), 0.0, 1.0)
-        return int(prob_like > threshhold), prob_like
+        return int(prob_like > random.random()), prob_like
 
 
     # 03. EVALUACIÓN, COMPRA Y LIKE/DISLIKE DEL VINO
@@ -752,8 +729,8 @@ class SyntheticUserSimulator:
         # Simulación de comportamiento de usuario
         user_input = self.generate_user_input()                             # Input del usuario
         tra_df = self._df_group_other_grapes(df=self.wine_df)               # Agregado de Otras Uvas
-        tra_df = self._score_wines(df=tra_df, user_input=user_input)        # Puntaje del vino (influye en like)
-        selected_wine = self.simulate_user_choice(tra_df, user_input)[0]    # Elección de vino
+        tra_df = self._score_wines(df=tra_df, user_input=user_input)        # Evaluación de vinos
+        user_choice_pack = self.simulate_user_choice(tra_df, user_input)    # Elección de vino
 
         # Asignación de timestamp
         # https://docs.python.org/3/library/datetime.html#timedelta-objects
@@ -769,7 +746,7 @@ class SyntheticUserSimulator:
             )
             timestamp = last_timestamp + timedelta(days=days_until_next_purchase)
 
-        if selected_wine is None:
+        if user_choice_pack is None:
             user_data = {
                 "event_timestamp": timestamp,
                 "user_id": user_id,
@@ -779,6 +756,7 @@ class SyntheticUserSimulator:
                 "prob_like": None
             }
         else:
+            selected_wine = user_choice_pack["selected_wine"]
             liked, prob_like = self.simulate_like(selected_wine)            # Like del vino
             user_data = {
                 "event_timestamp": timestamp,
