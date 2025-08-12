@@ -20,7 +20,8 @@ dependencies = [
     "openpyxl",
     "fastparquet",
     "python-dotenv",
-    "imblearn"
+    "imblearn",
+    "streamlit"
 ]
 
 [tool.setuptools.packages.find]
