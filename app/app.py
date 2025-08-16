@@ -305,7 +305,7 @@ def show_eda():
 
     st.markdown('<div class="subsubtitle-header">Gestión de Faltantes</div>', unsafe_allow_html=True)
     st.markdown("""
-    - `alcohol y tastes`: tomamos el promedio de alcohol o taste (body, sweetness, tannins, acidity) por uva para llenar el campo.
+    - `alcohol y tastes`: tomamos el promedio de alcohol o taste (body, sweetness, tannins, acidity) por uva para imputar el campo.
     - `rating_qty`: hay bastantes vinos con muy pocos ratings. En ese caso, podríamos hacer una compleción de nulos con el mínimo.
     - `pairing`: hay varios vinos que no tienen maridajes. Deberíamos eliminarlos, ya que no son útiles en nuestra app.
     - `grapes`: si no tiene ninguna uva, podemos dropear los vinos.
@@ -373,34 +373,111 @@ def show_eda():
     # Análisis de correlaciones
     st.markdown('<div class="subsection-header">🔗 Matriz de Correlaciones</div>', unsafe_allow_html=True)
     
-
+    # Características del Vino
     wine_features = ["rating", "year", "rating_qty", "price", "body", "tannins", "sweetness", "acidity", "alcohol"]
 
+    # Uvas
+    grapes_cols = pd.read_csv("src/data/processed/aux/grapes.csv")
+    grapes_cols = grapes_cols["grapes"].to_list()
+    grapes_cols.insert(0,"rating")
+    # Elimino columnas sin correlación (NaN)
+    grapes_with_corr = wines_clean[grapes_cols].loc[:, (wines_clean[grapes_cols].sum() > 0)].columns.to_list()
+    
+    # Notas de Sabor
+    notes_cols = pd.read_csv("src/data/processed/aux/notes.csv")
+    notes_cols = notes_cols["notes"].to_list()
+    notes_cols.insert(0,"rating")
+
+    # Maridajes
+    pairings_cols = pd.read_csv("src/data/processed/aux/pairings.csv")
+    pairings_cols = pairings_cols["pairings"].to_list()
+    pairings_cols.insert(0, "rating")
+
+    # Regiones
+    region_cols = pd.read_csv("src/data/processed/aux/region.csv")
+    region_cols = region_cols["region"].to_list()
+    region_cols.insert(0,"rating")
+
+
     corr_selector_map = {
-        "Wine Features": wine_features
+        "Características del Vino": wine_features,
+        "Uvas": grapes_with_corr,
+        "Notas de Sabor": notes_cols,
+        "Maridajes": pairings_cols,
+        "Regiones": region_cols
     }
 
-    selected_group = st.selectbox("Selecciona un grupo de análisis:", corr_selector_map.keys())
-    correlation_matrix = wines_clean[corr_selector_map[selected_group]].corr()
+    # Matriz de correlación
+    sel_group_col, sel_meth_col = st.columns(2)
+
+    with sel_group_col:
+        selected_group = st.selectbox("Selecciona un grupo de análisis:", corr_selector_map.keys())
+    
+    with sel_meth_col:
+        selected_method = st.selectbox("Selecciona un grupo de análisis:", ["pearson", "spearman"])
+    
+    correlation_matrix = wines_clean[corr_selector_map[selected_group]].corr(method=selected_method)
     fig_corr = px.imshow(
         correlation_matrix,
         text_auto=".2f",
-        title="Matriz de Correlaciones",
+        title=f"Matriz de Correlaciones",
         color_continuous_scale="RdBu_r"
     )
     
     # Insertar el gráfico con scroll vertical en un área fija
     fig_corr.update_layout(
-        height=600,
-        margin=dict(l=150, r=50, t=50, b=50)
+        height=800,
+        margin=dict(l=50, r=50, t=50, b=50)
     )
 
     # Aumentar tamaño del texto de las anotaciones (los números)
-    fig_corr.update_traces(textfont={"size":18})  # tamaño de los números
+    fig_corr.update_traces(textfont={"size":12})  # tamaño de los números
 
     st.plotly_chart(fig_corr, use_container_width=True)
-    
-    
+
+    # Correlación con variable objetivo
+    corr_matrix_rating = correlation_matrix["rating"].sort_values(ascending=False)
+
+    fig_corr_rating = px.bar(
+        x=corr_matrix_rating.index,
+        y=corr_matrix_rating.values,
+        title=f"Correlación de {selected_method} con Rating",
+        labels={'x': '', 'y': 'Correlación con rating'},
+        orientation="v",
+        color=corr_matrix_rating.values,  # <- esto define el color de cada barra
+        color_continuous_scale="RdBu_r"
+    )
+
+    fig_corr_rating.update_layout(
+        height=300,
+        margin=dict(l=50, r=50, t=50, b=50)
+    )
+
+    # Insertar el gráfico con scroll vertical en un área fija
+    components.html(
+        fig_corr_rating.to_html(full_html=False, include_plotlyjs='cdn'),
+        height=350,  # alto fijo del contenedor
+        width=1000
+    )
+
+    # Co-Ocurrrencia de Variables
+    st.markdown('<div class="subsection-header">👥 Co-Ocurrencia de Variables</div>', unsafe_allow_html=True)
+
+    var_group1_col, var_group2_col = st.columns(2)
+
+    var_group_options1 = ["Uvas", "Notas de Sabor", "Maridajes", "Regiones"]
+
+    with var_group1_col:
+        var_group_1 = st.selectbox("Seleccionar grupo de variables 1:", var_group_options1)
+
+    var_group_options2 = [f for f in var_group_options1 if f not in var_group_1]
+
+    with var_group2_col:
+        var_group_2 = st.selectbox("Seleccionar grupo de variables 2:", var_group_options2)
+
+
+
+
     # Análisis por target
     st.markdown('<div class="subsection-header">🎯 Análisis por Variable Objetivo</div>', unsafe_allow_html=True)
     
