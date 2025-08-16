@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import streamlit.components.v1 as components
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
@@ -11,6 +12,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix
 import warnings
+
+from src.utils import utils as ut
+
 warnings.filterwarnings('ignore')
 
 # Configuración de la página
@@ -44,6 +48,13 @@ st.markdown("""
         color: #2ca02c;
         margin-top: 1.5rem;
         margin-bottom: 1rem;
+    }
+    .subsubtitle-header {
+        font-size: 1.2rem;
+        color: #555; /* gris oscuro para contraste */
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+        font-style: italic; /* opcional, le da un toque distinto */
     }
     .metric-container {
         background-color: #f0f2f6;
@@ -96,6 +107,18 @@ def main():
     elif page == "⚡ Aplicación Interactiva":
         show_interactive_app()
 
+
+
+
+
+#=====================================#
+# INTRODUCCIÓN
+#=====================================#
+
+
+
+
+
 def show_introduction():
     st.markdown('<div class="main-header">📊 Proyecto Final - Diplomatura en Data Science</div>', unsafe_allow_html=True)
     
@@ -107,15 +130,13 @@ def show_introduction():
         
         st.markdown("""
         <div class="highlight-box">
-        <h3>🔍 Título del Proyecto</h3>
-        <p><strong>Wine Sommelier</strong></p>
+        <h3>🍷 Wine Sommelier</h3>
         
-        <h3>📚 Tipo de Diplomado</h3>
-        <p>Diplomatura en Data Science con Python y R</p>
+        <h3>📚 Dplo. Data Science con Python y R</h3>
         
         <h3>👩‍🏫 Participantes</h3>
         <p><strong>Alumno:</strong> Martín Augusto Gutiérrez</p>
-        <p><strong>Tutor:</strong> Ignacio Urteaga, Julio Paredes, Anahí Romo Santagostino</p>
+        <p><strong>Tutores:</strong> Ignacio Urteaga, Julio Paredes, Anahí Romo Santagostino</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -156,12 +177,12 @@ def show_introduction():
         ### 🔬 Hipótesis
         
         **Hipótesis Principal:**
-        - [Tu hipótesis principal]
+        - Existe una mayor probabilidad de que a un usuario le guste un vino si este cumple con sus demandas de sabor y calidad.
         
         **Hipótesis Secundarias:**
-        1. [Hipótesis 1]
-        2. [Hipótesis 2]
-        3. [Hipótesis 3]
+        1. El usuario valora vinos con buen rating percibido por otros usuarios.
+        2. El usuario valora vinos que tengan sabores similares a los que demanda.
+        3. Un usuario al que se le recomienda un vino que le gusta acaba comprando más y generando más rentabilidad para la bodega.
         """)
     
     # Metodología
@@ -172,101 +193,178 @@ def show_introduction():
     with methodology_cols[0]:
         st.markdown("""
         #### 📥 1. Recolección
-        - Fuente de datos
-        - Procesamiento inicial
-        - Validación de calidad
+        - Fuente: www.vivino.com
+        - Web Scrapping
+        - Procesamiento inicial (ETL)
         """)
     
     with methodology_cols[1]:
         st.markdown("""
-        #### 🔍 2. Exploración
-        - Análisis descriptivo
-        - Visualizaciones interactivas
-        - Detección de patrones
+        #### 🔍 2. Exploración (EDA)
+        - Análisis de Nulos
+        - Análisis descriptivos
+        - Análisis de relaciones
+        - Otros análisis avanzados
         """)
     
     with methodology_cols[2]:
         st.markdown("""
         #### 🤖 3. Modelado
-        - Feature Engineering
-        - Múltiples algoritmos
-        - Optimización de hiperparámetros
+        - Usuario Sintético + Simulación
+        - Feature Engineering + Feature Selection
+        - Algoritmos + Finetunning
         """)
     
     with methodology_cols[3]:
         st.markdown("""
         #### 💰 4. Evaluación
-        - Análisis económico
+        - Análisis de performance de modelo
+        - Análisis económico entre modelos
         - Selección por rentabilidad
         - Implementación
         """)
+
+
+
+
+
+#=====================================#
+# ANÁLISIS EXPLORATORIO (EDA)
+#=====================================#
+
+
+
+
+
 
 def show_eda():
     st.markdown('<div class="section-header">📊 Análisis Exploratorio de Datos (EDA)</div>', unsafe_allow_html=True)
     
     # Aquí cargarías tus datos reales
-    # df = pd.read_csv('tu_dataset.csv')
-    
-    # Ejemplo con datos simulados - REEMPLAZA CON TUS DATOS REALES
-    np.random.seed(42)
-    df_example = pd.DataFrame({
-        'feature1': np.random.normal(100, 15, 1000),
-        'feature2': np.random.exponential(2, 1000),
-        'feature3': np.random.choice(['A', 'B', 'C'], 1000),
-        'target': np.random.choice([0, 1], 1000)
-    })
+    wines_tra = pd.read_csv("src/data/transformed/wines_transformed.csv")
     
     # Información general del dataset
     st.markdown('<div class="subsection-header">📋 Información General del Dataset</div>', unsafe_allow_html=True)
     
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Registros", f"{len(df_example):,}")
+        st.metric("Registros ", f"{len(wines_tra):,}")
     with col2:
-        st.metric("Variables", f"{len(df_example.columns)}")
+        st.metric("Variables", f"{len(wines_tra.columns)}")
     with col3:
-        st.metric("Variables Numéricas", f"{len(df_example.select_dtypes(include=[np.number]).columns)}")
+        st.metric("Variables Numéricas", f"{len(wines_tra.select_dtypes(include=[np.number]).columns)}")
     with col4:
-        st.metric("Variables Categóricas", f"{len(df_example.select_dtypes(include=['object']).columns)}")
+        st.metric("Variables Categóricas", f"{len(wines_tra.select_dtypes(include=['object']).columns)}")
+
+    # Muestra del dataset con scroll
+    st.markdown('<div class="subsubtitle-header">🔍 Vista previa de los datos</div>', unsafe_allow_html=True)
+
+    st.dataframe(
+        wines_tra.head(50),  # muestra 50 filas, podés ajustar
+        height=300,      # alto fijo -> scroll vertical
+        use_container_width=True  # ocupa el ancho y mete scroll horizontal si hace falta
+)
+
     
     # Análisis de datos faltantes
-    st.markdown('<div class="subsection-header">🔍 Análisis de Datos Faltantes</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subsection-header">👻 Análisis de Datos Faltantes</div>', unsafe_allow_html=True)
     
     # Gráfico interactivo de datos faltantes
-    missing_data = df_example.isnull().sum()
-    if missing_data.sum() > 0:
+    missing_data = (
+        pd.DataFrame(wines_tra.isna().sum(), columns=["nulls"])
+        .sort_values("nulls", ascending=True)
+    )
+
+    # Filtrar solo las columnas con nulls
+    missing_data_filtered = missing_data[missing_data["nulls"] > 0]
+
+    if not missing_data_filtered.empty:
         fig_missing = px.bar(
-            x=missing_data.index, 
-            y=missing_data.values,
+            x=missing_data_filtered["nulls"],
+            y=missing_data_filtered.index,
             title="Datos Faltantes por Variable",
-            labels={'x': 'Variables', 'y': 'Cantidad de Datos Faltantes'}
+            labels={'x': 'Cantidad de Datos Faltantes', 'y': 'Variables'},
+            orientation="h",
+            color_discrete_sequence=["#1f77b4"]
         )
-        st.plotly_chart(fig_missing, use_container_width=True)
+        fig_missing.update_layout(
+            height=40 * len(missing_data_filtered),  # alto dinámico
+            margin=dict(l=150, r=50, t=50, b=50),
+            yaxis=dict(title_standoff=20)  # separa el label "Variables" del eje
+        )
+
+        # Insertar el gráfico con scroll vertical en un área fija
+        components.html(
+            fig_missing.to_html(full_html=False, include_plotlyjs='cdn'),
+            height=400,  # alto fijo del contenedor
+            width=1000,
+            scrolling=True
+        )
     else:
         st.success("✅ No se encontraron datos faltantes en el dataset")
-    
+
+    st.markdown('<div class="subsubtitle-header">Gestión de Faltantes</div>', unsafe_allow_html=True)
+    st.markdown("""
+    - `alcohol y tastes`: tomamos el promedio de alcohol o taste (body, sweetness, tannins, acidity) por uva para llenar el campo.
+    - `rating_qty`: hay bastantes vinos con muy pocos ratings. En ese caso, podríamos hacer una compleción de nulos con el mínimo.
+    - `pairing`: hay varios vinos que no tienen maridajes. Deberíamos eliminarlos, ya que no son útiles en nuestra app.
+    - `grapes`: si no tiene ninguna uva, podemos dropear los vinos.
+    - `price`: los vinos con precio nulo son dudosos en vivino. Lo más seguro creo que es dropearlo (además, son pocos).
+    - `year`: tomamos la mediana de año del vino por bodega (asumimos que la misma bodega tiene vinos cercanos a la media en el catálogo).
+    """)
+
     # Análisis de distribuciones
     st.markdown('<div class="subsection-header">📈 Análisis de Distribuciones</div>', unsafe_allow_html=True)
+    st.markdown("*(variables one-hot y outliers quitados para una mejor visualización)*")
     
+    # Carga de datos limpios
+    wines_clean = pd.read_csv("src/data/transformed/wines_clean.csv")
+
     # Selección interactiva de variable
-    numeric_columns = df_example.select_dtypes(include=[np.number]).columns.tolist()
-    selected_var = st.selectbox("Selecciona una variable numérica:", numeric_columns)
-    
+    numeric_columns = wines_clean.select_dtypes(include=[np.number]).columns.tolist()
+    valid_numeric = numeric_columns[:22] # Deja variables one-hot fuera
+    selected_var = st.selectbox("Selecciona una variable numérica:", valid_numeric)
+    wines_clean_num = ut.manage_outlier_IQR(data=wines_clean[valid_numeric], func="remove")
+
     if selected_var:
         col_hist, col_box = st.columns(2)
         
         with col_hist:
-            fig_hist = px.histogram(
-                df_example, 
-                x=selected_var,
+            sel_x = wines_clean_num[selected_var].dropna()
+
+            fig_hist = go.Figure()
+
+            # Histograma
+            fig_hist.add_trace(go.Histogram(
+                x=sel_x,
+                nbinsx=50,
+                marker_color="#1f77b4",
+                opacity=0.7,
+                name="Frecuencia"
+            ))
+
+            # KDE (curva suavizada)
+            from scipy.stats import gaussian_kde
+            kde = gaussian_kde(sel_x)
+            x_range = np.linspace(sel_x.min(), sel_x.max(), 200)
+            fig_hist.add_trace(go.Scatter(
+                x=x_range,
+                y=kde(x_range) * len(sel_x) * (sel_x.max()-sel_x.min())/50,  # escalar al histograma
+                mode="lines",
+                line=dict(color="red", width=2),
+                name="Densidad"
+            ))
+
+            fig_hist.update_layout(
                 title=f"Distribución de {selected_var}",
-                nbins=50
+                bargap=0.05
             )
+
             st.plotly_chart(fig_hist, use_container_width=True)
         
         with col_box:
             fig_box = px.box(
-                df_example, 
+                wines_clean_num, 
                 y=selected_var,
                 title=f"Box Plot de {selected_var}"
             )
@@ -275,19 +373,38 @@ def show_eda():
     # Análisis de correlaciones
     st.markdown('<div class="subsection-header">🔗 Matriz de Correlaciones</div>', unsafe_allow_html=True)
     
-    correlation_matrix = df_example.select_dtypes(include=[np.number]).corr()
+
+    wine_features = ["rating", "year", "rating_qty", "price", "body", "tannins", "sweetness", "acidity", "alcohol"]
+
+    corr_selector_map = {
+        "Wine Features": wine_features
+    }
+
+    selected_group = st.selectbox("Selecciona un grupo de análisis:", corr_selector_map.keys())
+    correlation_matrix = wines_clean[corr_selector_map[selected_group]].corr()
     fig_corr = px.imshow(
         correlation_matrix,
-        text_auto=True,
+        text_auto=".2f",
         title="Matriz de Correlaciones",
         color_continuous_scale="RdBu_r"
     )
+    
+    # Insertar el gráfico con scroll vertical en un área fija
+    fig_corr.update_layout(
+        height=600,
+        margin=dict(l=150, r=50, t=50, b=50)
+    )
+
+    # Aumentar tamaño del texto de las anotaciones (los números)
+    fig_corr.update_traces(textfont={"size":18})  # tamaño de los números
+
     st.plotly_chart(fig_corr, use_container_width=True)
+    
     
     # Análisis por target
     st.markdown('<div class="subsection-header">🎯 Análisis por Variable Objetivo</div>', unsafe_allow_html=True)
     
-    if 'target' in df_example.columns:
+    if 'target' in wines_clean.columns:
         target_analysis_var = st.selectbox(
             "Selecciona una variable para analizar vs target:", 
             [col for col in numeric_columns if col != 'target']
@@ -295,7 +412,7 @@ def show_eda():
         
         if target_analysis_var:
             fig_target = px.box(
-                df_example, 
+                wines_clean, 
                 x='target', 
                 y=target_analysis_var,
                 title=f"Distribución de {target_analysis_var} por Target"
