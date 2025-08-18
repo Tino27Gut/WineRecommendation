@@ -1,3 +1,5 @@
+# streamlit run /home/martingut27/WineRecommendation/app/app.py
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -7,6 +9,7 @@ from plotly.subplots import make_subplots
 import streamlit.components.v1 as components
 import seaborn as sns
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -285,7 +288,7 @@ def show_eda():
             title="Datos Faltantes por Variable",
             labels={'x': 'Cantidad de Datos Faltantes', 'y': 'Variables'},
             orientation="h",
-            color_discrete_sequence=["#1f77b4"]
+            color_discrete_sequence=["purple"]
         )
         fig_missing.update_layout(
             height=40 * len(missing_data_filtered),  # alto dinámico
@@ -338,7 +341,7 @@ def show_eda():
             fig_hist.add_trace(go.Histogram(
                 x=sel_x,
                 nbinsx=50,
-                marker_color="#1f77b4",
+                marker_color="salmon",
                 opacity=0.7,
                 name="Frecuencia"
             ))
@@ -351,7 +354,7 @@ def show_eda():
                 x=x_range,
                 y=kde(x_range) * len(sel_x) * (sel_x.max()-sel_x.min())/50,  # escalar al histograma
                 mode="lines",
-                line=dict(color="red", width=2),
+                line=dict(color="purple", width=2),
                 name="Densidad"
             ))
 
@@ -366,7 +369,8 @@ def show_eda():
             fig_box = px.box(
                 wines_clean_num, 
                 y=selected_var,
-                title=f"Box Plot de {selected_var}"
+                title=f"Box Plot de {selected_var}",
+                color_discrete_sequence=["purple"]
             )
             st.plotly_chart(fig_box, use_container_width=True)
     
@@ -421,7 +425,7 @@ def show_eda():
         correlation_matrix,
         text_auto=".2f",
         title=f"Matriz de Correlaciones",
-        color_continuous_scale="RdBu_r"
+        color_continuous_scale="burgyl"
     )
     
     # Insertar el gráfico con scroll vertical en un área fija
@@ -445,7 +449,7 @@ def show_eda():
         labels={'x': '', 'y': 'Correlación con rating'},
         orientation="v",
         color=corr_matrix_rating.values,  # <- esto define el color de cada barra
-        color_continuous_scale="RdBu_r"
+        color_continuous_scale="burgyl"
     )
 
     fig_corr_rating.update_layout(
@@ -460,20 +464,262 @@ def show_eda():
         width=1000
     )
 
-    # Co-Ocurrrencia de Variables
+
+    # --------------------------- #
+    # Co-Ocurrrencia de Variables #
+    # --------------------------- #
+
     st.markdown('<div class="subsection-header">👥 Co-Ocurrencia de Variables</div>', unsafe_allow_html=True)
 
-    var_group1_col, var_group2_col = st.columns(2)
+    coocurrencias_options = [
+        "Maridaje + Uvas",
+        "Maridaje + Perfil de Sabor",
+        "Maridaje + Notas de Sabor",
+        "Uvas + Perfil de Sabor",
+        "Uvas + Notas de Sabor",
+        "Perfil de Sabor + Notas de Sabor"
+    ]
 
-    var_group_options1 = ["Uvas", "Notas de Sabor", "Maridajes", "Regiones"]
+    grapes_cols.remove("rating")
+    notes_cols.remove("rating")
+    pairings_cols.remove("rating")
+    region_cols.remove("rating")
 
-    with var_group1_col:
-        var_group_1 = st.selectbox("Seleccionar grupo de variables 1:", var_group_options1)
+    selected_coocu = st.selectbox("Seleccionar coocurrencia de variables:", coocurrencias_options)
 
-    var_group_options2 = [f for f in var_group_options1 if f not in var_group_1]
+    # Agrupación de maridajes para coocurrencias
+    pairing_groups = {
+        "Aperitivos y Chatarra": [
+            "any junk food will do",
+            "aperitif",
+            "appetizers and snacks"
+        ],
+        "Quesos": [
+            "blue cheese",
+            "goat's milk cheese",
+            "mature and hard cheese",
+            "mild and soft cheese"
+        ],
+        "Carnes Rojas": [
+            "beef",
+            "lamb",
+            "veal",
+            "game (deer, venison)"
+        ],
+        "Carnes Blancas": [
+            "pork",
+            "poultry"
+        ],
+        "Pescados y Mariscos": [
+            "lean fish",
+            "rich fish (salmon, tuna etc)",
+            "shellfish"
+        ],
+        "Vegetales y Hongos": [
+            "mushrooms",
+            "vegetarian"
+        ],
+        "Pasta": [
+            "pasta"
+        ],
+        "Embutidos": [
+            "cured meat"
+        ],
+        "Comida Picante": [
+            "spicy food"
+        ]
+    }
 
-    with var_group2_col:
-        var_group_2 = st.selectbox("Seleccionar grupo de variables 2:", var_group_options2)
+    # Sabores para coocurrencia
+    tastes_dict = {
+        "body": "body_scld",
+        "tannins": "tannins_scld",
+        "sweetness": "sweetness_scld",
+        "acidity": "acidity_scld"
+    }
+
+    tastes_plain = list(tastes_dict.keys())
+    tastes_scld = list(tastes_dict.values())
+
+    # Scaler
+    mm_scaler = MinMaxScaler()
+
+
+    # <-- Maridaje + Uvas -->
+    if selected_coocu == "Maridaje + Uvas":
+
+        # Calcular el % de vinos de cada pairing que caen en cada uva
+        grouped_pairing_grape_count = pd.DataFrame(0, index=list(pairing_groups.keys()), columns=grapes_cols)
+
+        for pairing_group, columns in pairing_groups.items():
+            wine_in_group = wines_clean[wines_clean[columns].any(axis=1) == 1]
+            wines_by_group = wine_in_group[grapes_cols].sum()
+            grouped_pairing_grape_count.loc[pairing_group] = wines_by_group
+
+        # Eliminar uvas sin vinos
+        wines_by_grape = grouped_pairing_grape_count[grapes_cols].sum()
+        grapes_with_no_wines = wines_by_grape.index[wines_by_grape==0]
+        grouped_pairing_grape_count = grouped_pairing_grape_count.drop(columns=grapes_with_no_wines)
+
+        # Calcular porcentajes
+        grouped_pairing_grape_perc = grouped_pairing_grape_count.div(
+            grouped_pairing_grape_count.sum(axis=1),
+            axis=0
+        )
+
+        # Crear heatmap interactivo con Plotly
+        fig_coocu = px.imshow(
+            grouped_pairing_grape_perc,
+            text_auto=".2f",
+            height=600,
+            aspect="auto",
+            color_continuous_scale="burgyl",
+            labels=dict(x="Uvas", y="Grupos de Maridaje", color="Porcentaje de Vinos"),
+            title="🍷 Distribución de Uvas agrupado por Grupo de Maridaje"
+        )
+    
+    
+    # <-- Maridaje + Perfil de Sabor -->
+    elif selected_coocu == "Maridaje + Perfil de Sabor":
+
+        mean_taste_by_pairing = pd.DataFrame(0, index=pairings_cols, columns=tastes_scld)
+        mean_taste_by_pairing[tastes_scld] = mean_taste_by_pairing[tastes_scld].astype(float)
+
+        columns_for_scaling = tastes_plain + pairings_cols
+        scaled_wines = wines_clean[columns_for_scaling].copy()
+
+        scaled_wines[tastes_scld] = mm_scaler.fit_transform(scaled_wines[tastes_plain])
+
+        grouped_pairing_taste_count = pd.DataFrame(0, index=list(pairing_groups.keys()), columns=tastes_scld)
+        grouped_pairing_taste_count[tastes_scld] = grouped_pairing_taste_count[tastes_scld].astype(float)
+
+        for pairing_group, columns in pairing_groups.items():
+            wine_in_group = scaled_wines[scaled_wines[columns].any(axis=1)==1]
+            mean_taste_by_group = wine_in_group[tastes_scld].mean()
+            grouped_pairing_taste_count.loc[pairing_group] = mean_taste_by_group
+        
+        fig_coocu = px.imshow(
+            grouped_pairing_taste_count,
+            text_auto=".2f",
+            aspect="auto",
+            color_continuous_scale="burgyl",
+            labels=dict(x="Perfil de Sabor", y="Grupos de Maridaje", color="Promedio"),
+            title="🍷 Perfil de Sabor promedio agrupado por Grupo de Maridaje"
+        )
+
+
+    # <-- Maridaje + Notas de Sabor -->
+    elif selected_coocu == "Maridaje + Notas de Sabor":
+
+        grouped_pairing_note_count = pd.DataFrame(0, index=list(pairing_groups.keys()), columns=notes_cols)
+        grouped_pairing_note_count[notes_cols] = grouped_pairing_note_count[notes_cols].astype(float)
+
+        for pairing_group, pairings in pairing_groups.items():
+            wine_with_pairing_group = wines_clean[wines_clean[pairings].any(axis=1)==1]
+            mean_by_note = wine_with_pairing_group[notes_cols].mean()
+            grouped_pairing_note_count.loc[pairing_group] = mean_by_note
+
+        fig_coocu = px.imshow(
+            grouped_pairing_note_count,
+            text_auto=".2f",
+            aspect="auto",
+            color_continuous_scale="burgyl",
+            labels=dict(x="Nota de Sabor", y="Grupos de Maridaje", color="Promedio"),
+            title="🍷 Notas de Sabor promedio agrupado por Grupo de Maridaje"
+        )
+
+
+    # <-- Uvas + Perfil de Sabor -->
+    elif selected_coocu == "Uvas + Perfil de Sabor":
+
+        mean_taste_by_grape = pd.DataFrame(0, index=grapes_cols, columns=tastes_scld)
+        mean_taste_by_grape[tastes_scld] = mean_taste_by_grape[tastes_scld].astype(float)
+
+        columns_for_scaling = tastes_plain + grapes_cols
+        scaled_wines = wines_clean[columns_for_scaling].copy()
+
+        scaled_wines[tastes_scld] = mm_scaler.fit_transform(scaled_wines[tastes_plain])
+
+        for grape in grapes_cols:
+            wines_with_grape = scaled_wines[scaled_wines[grape]==1]
+            mean_grape_tastes = wines_with_grape[tastes_scld].mean()
+            mean_taste_by_grape.loc[grape] = mean_grape_tastes
+
+        grapes_with_wines = mean_taste_by_grape.index[mean_taste_by_grape.sum(axis=1) > 0]
+        mean_taste_by_grape = mean_taste_by_grape.loc[grapes_with_wines]
+
+        fig_coocu = px.imshow(
+            mean_taste_by_grape,
+            text_auto=".2f",
+            height=600,
+            aspect="auto",
+            color_continuous_scale="burgyl",
+            labels=dict(x="Perfil de Sabor", y="Uvas", color="Promedio"),
+            title="🍷 Perfil de Sabor promedio agrupado por Uvas"
+        )
+
+
+    # <-- Uvas + Notas de Sabor -->
+    elif selected_coocu == "Uvas + Notas de Sabor":
+
+        grape_note_mean = pd.DataFrame(0, index=grapes_cols, columns=notes_cols)
+        grape_note_mean[notes_cols] = grape_note_mean[notes_cols].astype(float)
+
+        for grape in grapes_cols:
+            wines_with_grape = wines_clean[wines_clean[grape]==1]
+            mean_notes_in_grape = wines_with_grape[notes_cols].mean()
+            grape_note_mean.loc[grape] = mean_notes_in_grape
+
+        grapes_with_wines = grape_note_mean.index[grape_note_mean.sum(axis=1) > 0]
+        grape_note_mean = grape_note_mean.loc[grapes_with_wines]
+
+        fig_coocu = px.imshow(
+            grape_note_mean,
+            text_auto=".2f",
+            height=700,
+            aspect="auto",
+            color_continuous_scale="burgyl",
+            labels=dict(x="Notas de Sabor", y="Uvas", color="Promedio"),
+            title="🍷 Notas de Sabor promedio agrupado por Uvas"
+        )
+
+    
+    # <-- Perfil de Sabor + Notas de Sabor -->
+    elif selected_coocu == "Perfil de Sabor + Notas de Sabor":
+
+        columns_for_scaling = tastes_plain + notes_cols
+        scaled_wines = wines_clean[columns_for_scaling].copy()
+
+        scaled_wines[tastes_scld] = mm_scaler.fit_transform(scaled_wines[tastes_plain])
+
+        complete_corr_matrix = scaled_wines.corr()
+        sliced_corr_matrix = complete_corr_matrix.loc[notes_cols, tastes_scld]
+
+        fig_coocu = px.imshow(
+            sliced_corr_matrix,
+            text_auto=".2f",
+            aspect="auto",
+            color_continuous_scale="burgyl",
+            labels=dict(x="Perfil de Sabor", y="Notas de Sabor", color="Correlación"),
+            title="🍷 Correlación entre Perfil de Sabor y Notas de Sabor"
+        )
+
+    if fig_coocu is None:
+        st.error("❌ No seleccionaste una opción válida.")
+    else:
+        st.plotly_chart(fig_coocu, use_container_width=True)
+
+
+
+
+
+
+
+    # TODO:  PASAR ACÁ EL ANÁLISIS POR SABOR Y RATING. LUEGO ESCRIBIR CONCLUSIONES (CREO QUE EL DE CLUSTER NO TIENE SENTIDO)
+    # Una vez tengas eso, pasar al usuario sintético en el modelado directamente (mostrar gráficos de decision del usuario)
+
+
+
 
 
 
