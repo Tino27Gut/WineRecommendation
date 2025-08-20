@@ -16,6 +16,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix
 import warnings
 
+from models.synthetic_user import SyntheticUserSimulator
 from src.utils import utils as ut
 
 warnings.filterwarnings('ignore')
@@ -812,13 +813,25 @@ def show_eda():
         """, unsafe_allow_html=True)
 
 
+
+
+
+#=====================================#
+# LÓGICA DE USUARIO SINTÉTICO
+#=====================================#
+
+
+
+
+
+
 def show_synthetic_user_modeling():
     st.markdown('<div class="section-header">🎭 Modelado de Usuario Sintético</div>', unsafe_allow_html=True)
     
     # Introducción
     st.markdown("""
     <div class="highlight-box">
-    <p>🎯 <strong>Objetivo:</strong> Crear un modelo de comportamiento de consumidor que simule decisiones reales de compra de vinos basado en preferencias de maridaje, presupuesto y experiencias previas.</p>
+    <p>🎯 <strong>Objetivo:</strong> Crear un modelo de comportamiento de consumidor que simule decisiones reales de compra de vinos basado en preferencias de maridaje, presupuesto, sabor y uvas.</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -832,17 +845,20 @@ def show_synthetic_user_modeling():
         #### 🍽️ Flujo de Decisión:
         1. **Selección de Comida/Maridaje**
            - Usuario elige tipo de comida
-           - Sistema determina perfil de sabor óptimo
+           - Sistema ajusta rangos se sabor disponibles según ingredientes de la comida
         
         2. **Filtros de Preferencia**
            - Rango de precios personalizado
-           - Preferencias de uvas
-           - Tolerancia a nuevos sabores
+           - Preferencias de uvas 
+           - Perfil de sabor del vino
         
         3. **Evaluación de Opciones**
-           - Scoring basado en fit de perfil
-           - Ajuste por precio y popularidad
-           - Factor de riesgo/exploración
+           - Scoring basado en fit de vino con preferencias personalizadas del usuario
+           - Adición de factor aleatorio
+                    
+        4. **Like y Recompra**
+            - Simulación de like según puntaje de fit
+            - Simulación de recompra según experiencia anterior
         """)
     
     with logic_col2:
@@ -851,11 +867,13 @@ def show_synthetic_user_modeling():
         ```
         🍽️ Comida Elegida
               ↓
-        🎯 Perfil Sabor Óptimo
+        🎯 Ajuste de Rangos de Sabor
               ↓
         💰 Filtro Presupuesto
               ↓
         🍇 Filtro Uvas Preferidas
+              ↓
+        🍷 Elección de Perfil de Sabor
               ↓
         📊 Scoring de Opciones
               ↓
@@ -863,12 +881,479 @@ def show_synthetic_user_modeling():
               ↓
         👍👎 Like/Dislike
               ↓
-        🔄 Actualizar Preferencias
+        🔄 Abandono o Recompra
         ```
         """)
     
     # 2. Curvas de Decisión
     st.markdown('<div class="subsection-header">📈 Curvas de Decisión</div>', unsafe_allow_html=True)
+
+    wines_clean = pd.read_csv(ut.get_project_file_path("src", "data", "transformed", "wines_clean.csv"))
+    meals_df = pd.read_excel(ut.get_project_file_path("src", "data", "raw", "meals", "Meals.xlsx"))
+    synthetic_user = SyntheticUserSimulator(wine_df=wines_clean, meals_df=meals_df)
+
+    # Selector de visualización de curvas de decisión
+    viz_type = st.selectbox(
+        "🎯 Selecciona el tipo de análisis:",
+        ["Precio-Calidad", "Popularidad del Vino", "Similitud de Usuario (Fuzzy Distance)", "Efecto Main Pairing", "Score Conjunto 3D"]
+    )
+
+    # Crear tabs para mejor organización
+    tab1, tab2 = st.tabs(["📊 Visualización", "⚙️ Parámetros"])
+
+    with tab2:
+        st.markdown("#### Pesos del Sistema (Default)")
+        
+        # Mostrar los pesos por defecto de la clase
+        default_weights = synthetic_user.weights
+        
+        weight_cols = st.columns(len(default_weights))
+        for i, (component, weight) in enumerate(default_weights.items()):
+            with weight_cols[i]:
+                st.metric(
+                    component.replace("_", " ").title(),
+                    f"{weight:.0%}",
+                    help=f"Peso por defecto para {component}"
+                )
+        
+        st.markdown("---")
+        st.markdown("#### Parámetros de Prueba")
+        
+        # Parámetros compartidos
+        param_col1, param_col2 = st.columns(2)
+        
+        with param_col1:
+            test_user_min_price = st.slider("Precio Mínimo Usuario ($)", 5, 50, 15)
+            test_rating_threshold = st.slider("Umbral de Rating", 2.0, 4.5, 3.5, 0.1)
+            
+        with param_col2:
+            test_user_max_price_enabled = st.checkbox("Establecer Precio Máximo", value=False)
+            test_user_max_price = st.slider("Precio Máximo Usuario ($)", test_user_min_price+5, 200, 50) if test_user_max_price_enabled else None
+            test_price_sensitivity = st.slider("Sensibilidad al Precio", 0.1, 2.0, 0.5, 0.1)
+
+    with tab1:
+        if viz_type == "Precio-Calidad":
+            st.markdown("#### 💰 Análisis de Precio-Calidad")
+            
+            # Parámetros específicos para este análisis
+            analysis_col1, analysis_col2 = st.columns(2)
+            
+            with analysis_col1:
+                fixed_rating = st.slider("Rating Fijo (para análisis de precio)", 1.0, 5.0, 4.0, 0.1)
+            with analysis_col2:
+                fixed_price = st.slider("Precio Fijo (para análisis de rating)", 5, 100, 25)
+            
+            # Generar datos para gráficos
+            prices = np.linspace(5, 100, 200)
+            ratings = np.linspace(1.0, 5.0, 200)
+            
+            # Análisis de variación de precio
+            price_scores = []
+            price_quality_components = []
+            price_price_components = []
+            
+            for p in prices:
+                score = synthetic_user._calc_qual_price_score(
+                    fixed_rating, p, test_user_min_price, test_user_max_price, 
+                    test_rating_threshold, test_price_sensitivity
+                )
+                price_scores.append(score)
+            
+            # Análisis de variación de rating
+            rating_scores = []
+            
+            for r in ratings:
+                score = synthetic_user._calc_qual_price_score(
+                    r, fixed_price, test_user_min_price, test_user_max_price,
+                    test_rating_threshold, test_price_sensitivity
+                )
+                rating_scores.append(score)
+            
+            # Crear subplots
+            fig = make_subplots(
+                rows=2, cols=1,
+                subplot_titles=[
+                    f'Score vs Precio (Rating={fixed_rating})',
+                    f'Score vs Rating (Precio=${fixed_price})'
+                ]
+            )
+            
+            # Gráfico de precio
+            fig.add_trace(
+                go.Scatter(x=prices, y=price_scores, name="Score Precio-Calidad", 
+                        line=dict(color='#70284A', width=3)),
+                row=1, col=1
+            )
+            
+            # Gráfico de rating
+            fig.add_trace(
+                go.Scatter(x=ratings, y=rating_scores, name="Score Precio-Calidad", 
+                        line=dict(color='#DC7178', width=3), showlegend=False),
+                row=2, col=1
+            )
+            
+            # Líneas de referencia
+            if test_user_max_price_enabled and test_user_max_price:
+                fig.add_vline(x=test_user_max_price, line_dash="dash", line_color="gray", 
+                            annotation_text="Precio Máximo", row=1, col=1)
+            
+            fig.add_vline(x=test_user_min_price, line_dash="dash", line_color="gray", 
+                        annotation_text="Precio Mínimo", row=1, col=1)
+            fig.add_vline(x=test_rating_threshold, line_dash="dash", line_color="gray", 
+                        annotation_text="Umbral Rating", row=2, col=1)
+            
+            fig.update_layout(height=700, title_text="Análisis de Componente Precio-Calidad")
+            fig.update_xaxes(title_text="Precio ($)", row=1, col=1)
+            fig.update_xaxes(title_text="Rating", row=2, col=1)
+            fig.update_yaxes(title_text="Score", row=1, col=1)
+            fig.update_yaxes(title_text="Score", row=2, col=1)
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Calculadora interactiva
+            st.markdown("##### 🧮 Calculadora Interactiva")
+            calc_col1, calc_col2, calc_col3 = st.columns(3)
+            
+            with calc_col1:
+                calc_rating = st.number_input("Rating del Vino", 1.0, 5.0, 4.0, 0.1)
+                calc_price = st.number_input("Precio del Vino ($)", 1, 200, 25)
+            
+            calc_score = synthetic_user._calc_qual_price_score(
+                calc_rating, calc_price, test_user_min_price, test_user_max_price,
+                test_rating_threshold, test_price_sensitivity
+            )
+            
+            with calc_col2:
+                st.metric("Score Precio-Calidad", f"{calc_score:.3f}")
+                
+            with calc_col3:
+                st.metric("Contribución al Score Total", f"{calc_score * default_weights['price_quality']:.3f}")
+
+        elif viz_type == "Popularidad del Vino":
+            st.markdown("#### ⭐ Análisis de Popularidad")
+            
+            # Generar datos de popularidad
+            rating_quantities = np.arange(0, 1200, 10)
+            popularity_scores = [synthetic_user._calc_popularity_score(qty) for qty in rating_quantities]
+            
+            # Gráfico principal
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=rating_quantities, 
+                y=popularity_scores, 
+                mode='lines',
+                line=dict(color='purple', width=3),
+                name='Score de Popularidad',
+                fill='tozeroy',
+                fillcolor='rgba(128, 0, 128, 0.2)'
+            ))
+            
+            # Líneas de umbral
+            thresholds = [40, 70, 100, 150, 200, 300, 400, 500, 700, 1000]
+            threshold_scores = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+            
+            for thresh, score in zip(thresholds, threshold_scores):
+                fig.add_vline(x=thresh, line_dash="dot", line_color="gray", opacity=0.5)
+                fig.add_annotation(x=thresh, y=score + 0.05, text=f"{thresh}", 
+                                showarrow=False, font=dict(size=10))
+            
+            fig.update_layout(
+                title='Score de Popularidad vs Cantidad de Ratings',
+                xaxis_title='Número de Ratings',
+                yaxis_title='Score de Popularidad',
+                height=500
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Calculadora interactiva
+            st.markdown("##### 🧮 Calculadora de Popularidad")
+            
+            calc_col1, calc_col2, calc_col3 = st.columns(3)
+            
+            with calc_col1:
+                selected_qty = st.slider("Número de Ratings", 0, 1200, 300)
+                
+            calculated_score = synthetic_user._calc_popularity_score(selected_qty)
+            
+            with calc_col2:
+                st.metric("Score de Popularidad", f"{calculated_score:.1f}")
+                
+            with calc_col3:
+                st.metric("Contribución al Score Total", f"{calculated_score * default_weights['wine_popularity']:.3f}")
+
+        elif viz_type == "Similitud de Usuario (Fuzzy Distance)":
+            st.markdown("#### 🎯 Análisis de Similitud Fuzzy")
+            
+            # Parámetros específicos
+            fuzzy_col1, fuzzy_col2 = st.columns(2)
+            
+            with fuzzy_col1:
+                q_low = st.slider("Rango de Preferencia - Mínimo", 0.0, 1.0, 0.5, 0.01)
+                q_high = st.slider("Rango de Preferencia - Máximo", q_low, 1.0, 0.5, 0.01)
+                
+            with fuzzy_col2:
+                slope_factor = st.slider("Factor de Pendiente (Rigidez)", 1, 30, 13)
+                st.info(f"**Rango Preferido:** [{q_low:.2f}, {q_high:.2f}]")
+                st.info(f"**Ancho del Rango:** {q_high - q_low:.2f}")
+            
+            # Generar datos de similitud
+            values = np.linspace(0, 1.01, 100)
+            similarities = [synthetic_user._fuzzy_smooth_similarity(v, q_low, q_high, slope_factor) 
+                        for v in values]
+            
+            # Gráfico principal
+            fig = go.Figure()
+            
+            fig.add_trace(go.Scatter(
+                x=values, 
+                y=similarities, 
+                mode='lines',
+                line=dict(color='#70284A', width=3),
+                name='Score de Similitud',
+                fill='tozeroy',
+                fillcolor='#fbe6c5'
+            ))
+            
+            # Destacar rango preferido
+            fig.add_vrect(
+                x0=q_low, x1=q_high,
+                fillcolor="green", opacity=0.2,
+                layer="below", line_width=0
+            )
+            
+            # Líneas de referencia
+            fig.add_vline(x=q_low, line_dash="dash", line_color="green", 
+                        annotation_text="Mín Preferencia")
+            fig.add_vline(x=q_high, line_dash="dash", line_color="green", 
+                        annotation_text="Máx Preferencia")
+            
+            fig.update_layout(
+                title='Score de Similitud Fuzzy vs Valor de Característica del Vino',
+                xaxis_title='Valor de Característica del Vino',
+                yaxis_title='Score de Similitud',
+                height=500,
+                yaxis_range=[0, 1.1]
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Calculadora interactiva
+            st.markdown("##### 🧮 Calculadora de Similitud")
+            
+            calc_col1, calc_col2, calc_col3, calc_col4 = st.columns(4)
+            
+            with calc_col1:
+                test_value = st.slider("Valor de Prueba", 0.0, 1.0, 0.5, 0.01)
+                
+            similarity_score = synthetic_user._fuzzy_smooth_similarity(test_value, q_low, q_high, slope_factor)
+            distance_from_range = max(0, q_low - test_value, test_value - q_high)
+            in_range = q_low <= test_value <= q_high
+            
+            with calc_col2:
+                st.metric("Score de Similitud", f"{similarity_score:.3f}")
+                
+            with calc_col3:
+                st.metric("Distancia del Rango", f"{distance_from_range:.1f}")
+                
+            with calc_col4:
+                st.metric("¿En Rango?", "✅ Sí" if in_range else "❌ No")
+
+        elif viz_type == "Efecto Main Pairing":
+            st.markdown("#### 🍽️ Análisis de Efecto Main Pairing")
+            
+            st.info("**Lógica:** Si el vino tiene como maridaje el ingrediente principal de la comida, suma +0.1 al score final.")
+            
+            # Simulación de scores base
+            base_scores = np.linspace(0.1, 0.9, 100)
+            scores_with_pairing = np.clip(base_scores + 0.1, 0, 1)
+            
+            # Gráfico principal
+            fig = go.Figure()
+            
+            # Scores sin pairing
+            fig.add_trace(go.Scatter(
+                x=list(range(len(base_scores))), 
+                y=base_scores,
+                mode='lines',
+                line=dict(color='red', width=2),
+                name='Sin Main Pairing'
+            ))
+            
+            # Scores con pairing
+            fig.add_trace(go.Scatter(
+                x=list(range(len(scores_with_pairing))), 
+                y=scores_with_pairing,
+                mode='lines',
+                line=dict(color='green', width=2),
+                name='Con Main Pairing (+0.1)'
+            ))
+            
+            # Área de diferencia
+            fig.add_trace(go.Scatter(
+                x=list(range(len(base_scores))) + list(range(len(base_scores)))[::-1],
+                y=list(base_scores) + list(scores_with_pairing)[::-1],
+                fill='tonexty',
+                fillcolor='rgba(0, 255, 0, 0.2)',
+                line=dict(color='rgba(255,255,255,0)'),
+                name='Bonus de Pairing',
+                showlegend=False
+            ))
+            
+            fig.update_layout(
+                title='Efecto de Main Pairing en Scores de Vinos',
+                xaxis_title='Muestra de Vino',
+                yaxis_title='Score Final',
+                height=500,
+                yaxis_range=[0, 1]
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Calculadora de impacto
+            st.markdown("##### 🧮 Calculadora de Impacto de Pairing")
+            
+            calc_col1, calc_col2 = st.columns(2)
+            
+            with calc_col1:
+                base_score = st.slider("Score Base del Vino", 0.0, 1.0, 0.65, 0.01)
+                has_pairing = st.checkbox("¿Tiene Main Ingredient Pairing?", value=False)
+                
+            final_score = min(1.0, base_score + (0.1 if has_pairing else 0.0))
+            improvement = (0.1 if has_pairing and base_score <= 0.9 else max(0, 1.0 - base_score)) if has_pairing else 0
+            
+            with calc_col2:
+                st.metric("Score Final", f"{final_score:.3f}", 
+                        f"+{improvement:.3f}" if improvement > 0 else None)
+                st.metric("Mejora Relativa", f"{improvement*100:.1f}%")
+            
+            # Tabla de resumen
+            st.markdown("##### 📊 Resumen de Impacto")
+            sample_scores = [0.3, 0.5, 0.7, 0.85, 0.95]
+            df_summary = pd.DataFrame({
+                'Score Base': sample_scores,
+                'Con Pairing': [min(1.0, s + 0.1) for s in sample_scores],
+                'Ganancia Absoluta': [min(0.1, 1.0 - s) for s in sample_scores],
+                'Ganancia Relativa %': [f"{min(0.1, 1.0 - s) / s * 100:.1f}%" for s in sample_scores]
+            })
+            
+            st.dataframe(df_summary, use_container_width=True)
+
+        elif viz_type == "Score Conjunto 3D":
+            st.markdown("#### 📈 Visualización de Score Conjunto 3D")
+            
+            # Parámetros para la superficie 3D
+            surface_col1, surface_col2 = st.columns(2)
+            
+            with surface_col1:
+                fixed_popularity = st.slider("Popularidad Fija (qty ratings)", 0, 1000, 300, 50)
+                fixed_similarity = st.slider("Similitud Fija", 0.0, 1.0, 0.8, 0.1)
+                
+            with surface_col2:
+                has_main_pairing_3d = st.checkbox("Con Main Pairing", value=True)
+                surface_resolution = st.select_slider("Resolución del Gráfico", 
+                                                    options=[20, 30, 40, 50], value=30)
+            
+            # Crear meshgrid
+            price_range = np.linspace(5, min(100, test_user_min_price * 3), surface_resolution)
+            rating_range = np.linspace(1.0, 5.0, surface_resolution)
+            P, R = np.meshgrid(price_range, rating_range)
+            Z = np.zeros_like(P)
+            
+            # Calcular scores para cada combinación
+            popularity_score = synthetic_user._calc_popularity_score(fixed_popularity)
+            main_pairing_bonus = 0.1 if has_main_pairing_3d else 0.0
+            
+            for i in range(len(rating_range)):
+                for j in range(len(price_range)):
+                    # Score precio-calidad
+                    pq_score = synthetic_user._calc_qual_price_score(
+                        R[i,j], P[i,j], test_user_min_price, test_user_max_price,
+                        test_rating_threshold, test_price_sensitivity
+                    )
+                    
+                    # Score conjunto
+                    combined_score = (
+                        pq_score * default_weights['price_quality'] +
+                        popularity_score * default_weights['wine_popularity'] +
+                        fixed_similarity * default_weights['user_similarity'] +
+                        main_pairing_bonus * default_weights['main_pairing']
+                    )
+                    
+                    Z[i,j] = min(1.0, combined_score)
+            
+            # Crear gráfico 3D
+            fig_3d = go.Figure(data=[go.Surface(
+                x=P, y=R, z=Z, 
+                colorscale='Viridis',
+                showscale=True,
+                colorbar=dict(title="Score Conjunto")
+            )])
+            
+            fig_3d.update_layout(
+                title=f'Score Conjunto 3D<br><sub>Popularidad={popularity_score:.1f}, Similitud={fixed_similarity:.1f}, Main Pairing={"Sí" if has_main_pairing_3d else "No"}</sub>',
+                scene=dict(
+                    xaxis_title='Precio ($)',
+                    yaxis_title='Rating',
+                    zaxis_title='Score Conjunto',
+                    camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
+                ),
+                height=600
+            )
+            
+            st.plotly_chart(fig_3d, use_container_width=True)
+            
+            # Métricas del punto óptimo
+            max_score_idx = np.unravel_index(np.argmax(Z), Z.shape)
+            optimal_price = P[max_score_idx]
+            optimal_rating = R[max_score_idx]
+            optimal_score = Z[max_score_idx]
+            
+            st.markdown("##### 🏆 Punto Óptimo Encontrado")
+            opt_col1, opt_col2, opt_col3 = st.columns(3)
+            
+            with opt_col1:
+                st.metric("Precio Óptimo", f"${optimal_price:.0f}")
+                
+            with opt_col2:
+                st.metric("Rating Óptimo", f"{optimal_rating:.1f}")
+                
+            with opt_col3:
+                st.metric("Score Máximo", f"{optimal_score:.3f}")
+
+    # Información adicional sobre los componentes
+    st.markdown("---")
+    st.markdown("#### 📋 Resumen de Componentes del Sistema")
+
+    info_col1, info_col2 = st.columns(2)
+
+    with info_col1:
+        st.markdown("""
+        **🏆 Precio-Calidad (40%)**
+        - Combina percepción de calidad (rating) y precio
+        - Usa función sigmoide para calidad
+        - Considera rango de precios del usuario
+        - Penaliza precios fuera del rango aceptable
+        
+        **⭐ Popularidad del Vino (15%)**
+        - Basado en cantidad de ratings
+        - Función escalonada con umbrales fijos
+        - Más ratings = mayor score de popularidad
+        """)
+
+    with info_col2:
+        st.markdown("""
+        **🎯 Similitud de Usuario (35%)**
+        - Matching difuso con preferencias del usuario
+        - Decaimiento exponencial fuera del rango preferido
+        - Factor de pendiente controla rigidez
+        
+        **🍽️ Main Pairing (10%)**
+        - Bonus simple de +0.1
+        - Se aplica cuando vino tiene ingrediente principal
+        - Limitado por score máximo de 1.0
+        """)
+
     
     # Selector de tipo de usuario
     user_type = st.selectbox(

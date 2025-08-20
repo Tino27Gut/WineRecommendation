@@ -646,6 +646,11 @@ class SyntheticUserSimulator:
             estas variables se usan únicamente para simular si el usuario 'likea'
             o no el vino luego de probarlo, permitiendo mantener la independencia
             entre inputs de simulación y entrenamiento del modelo.
+
+            Si definimos la elección del vino en base a inputs que el modelo usa para
+            entrenarse, se ingresa en la generación de datos la misma lógica que 
+            buscamos que el modelo aprenda. Esto generaba que el modelo alcance métricas
+            artificialmente altas, generando overfitting.
         """
         # User Inputs
         user_pairings = user_input.get("pairing_list")
