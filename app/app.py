@@ -891,58 +891,93 @@ def show_synthetic_user_modeling():
     wines_clean = pd.read_csv(ut.get_project_file_path("src", "data", "transformed", "wines_clean.csv"))
     meals_df = pd.read_excel(ut.get_project_file_path("src", "data", "raw", "meals", "Meals.xlsx"))
     synthetic_user = SyntheticUserSimulator(wine_df=wines_clean, meals_df=meals_df)
+    default_weights = synthetic_user.weights
 
     # Selector de visualización de curvas de decisión
     viz_type = st.selectbox(
         "🎯 Selecciona el tipo de análisis:",
-        ["Precio-Calidad", "Popularidad del Vino", "Similitud de Usuario (Fuzzy Distance)", "Efecto Main Pairing", "Score Conjunto 3D"]
+        ["Precio-Calidad", "Popularidad del Vino", "Similitud con Gustos del Usuario", "Efecto Main Pairing", "Score Conjunto 3D"]
     )
 
     # Crear tabs para mejor organización
     tab1, tab2 = st.tabs(["📊 Visualización", "⚙️ Parámetros"])
 
     with tab2:
-        st.markdown("#### Pesos del Sistema (Default)")
-        
-        # Mostrar los pesos por defecto de la clase
-        default_weights = synthetic_user.weights
-        
-        weight_cols = st.columns(len(default_weights))
-        for i, (component, weight) in enumerate(default_weights.items()):
-            with weight_cols[i]:
-                st.metric(
-                    component.replace("_", " ").title(),
-                    f"{weight:.0%}",
-                    help=f"Peso por defecto para {component}"
-                )
-        
-        st.markdown("---")
-        st.markdown("#### Parámetros de Prueba")
-        
-        # Parámetros compartidos
-        param_col1, param_col2 = st.columns(2)
-        
-        with param_col1:
-            test_user_min_price = st.slider("Precio Mínimo Usuario ($)", 5, 50, 15)
-            test_rating_threshold = st.slider("Umbral de Rating", 2.0, 4.5, 3.5, 0.1)
+
+        if viz_type == "Precio-Calidad":
+            # Parámetros específicos para este análisis
+            analysis_col1, analysis_col2, analysis_col3 = st.columns(3)
             
-        with param_col2:
             test_user_max_price_enabled = st.checkbox("Establecer Precio Máximo", value=False)
-            test_user_max_price = st.slider("Precio Máximo Usuario ($)", test_user_min_price+5, 200, 50) if test_user_max_price_enabled else None
-            test_price_sensitivity = st.slider("Sensibilidad al Precio", 0.1, 2.0, 0.5, 0.1)
+            with analysis_col1:
+                st.markdown("###### Características del Vino Analizado")
+                fixed_rating = st.slider("Rating Del Vino Analizado (para análisis de precio)", 1.0, 5.0, 4.0, 0.1)
+                fixed_price = st.slider("Precio Del Vino Analizado (para análisis de rating)", 5, 100, 25)
+            with analysis_col2:
+                st.markdown("###### Parámetros del Usuario")
+                test_user_min_price = st.slider("Precio Mínimo Usuario ($)", 5, 50, 15)
+                test_user_max_price = st.slider("Precio Máximo Usuario ($)", test_user_min_price+5, 200, 50) if test_user_max_price_enabled else None
+            with analysis_col3:
+                st.markdown("###### Hiperparámetros de Curvas")
+                test_rating_threshold = st.slider("Umbral de Rating", 2.0, 4.5, 3.5, 0.1)
+                test_price_sensitivity = st.slider("Sensibilidad al Precio", 0.1, 2.0, 0.5, 0.1)
+
+        elif viz_type == "Similitud con Gustos del Usuario":
+            # Parámetros específicos para este análisis
+            analysis_col1, analysis_col2, analysis_col3 = st.columns(3)
+
+            with analysis_col1:
+                q_low = st.slider("Rango de Preferencia - Mínimo", 0.0, 1.0, 0.5, 0.01)
+            with analysis_col2:
+                q_high = st.slider("Rango de Preferencia - Máximo", q_low, 1.0, 0.6, 0.01)
+            with analysis_col3:
+                slope_factor = st.slider("Pendiente de la Curva", 1, 50, 13)
+
+        elif viz_type == "Score Conjunto 3D":
+            # Parámetros específicos para este análisis
+            analysis_col1, analysis_col2, analysis_col3 = st.columns(3)
+            
+            test_user_max_price_enabled = st.checkbox("Establecer Precio Máximo", value=False)
+            has_main_pairing_3d = st.checkbox("Con Main Pairing", value=True)
+            with analysis_col1:
+                st.markdown("###### Características del Vino Analizado")
+                fixed_popularity = st.slider("Popularidad Fija (qty ratings)", 0, 1000, 300, 50)
+                fixed_similarity = st.slider("Similitud Fija", 0.0, 1.0, 0.8, 0.1)
+            with analysis_col2:
+                st.markdown("###### Parámetros del Usuario")
+                test_user_min_price = st.slider("Precio Mínimo Usuario ($)", 5, 50, 15)
+                test_user_max_price = st.slider("Precio Máximo Usuario ($)", test_user_min_price+5, 200, 50) if test_user_max_price_enabled else None
+            with analysis_col3:
+                st.markdown("###### Hiperparámetros de Curvas")
+                test_rating_threshold = st.slider("Umbral de Rating", 2.0, 4.5, 3.5, 0.1)
+                test_price_sensitivity = st.slider("Sensibilidad al Precio", 0.1, 2.0, 0.5, 0.1)
+
+      
 
     with tab1:
         if viz_type == "Precio-Calidad":
             st.markdown("#### 💰 Análisis de Precio-Calidad")
             
-            # Parámetros específicos para este análisis
-            analysis_col1, analysis_col2 = st.columns(2)
-            
-            with analysis_col1:
-                fixed_rating = st.slider("Rating Fijo (para análisis de precio)", 1.0, 5.0, 4.0, 0.1)
-            with analysis_col2:
-                fixed_price = st.slider("Precio Fijo (para análisis de rating)", 5, 100, 25)
-            
+            selection_col1, selection_col2, selection_col3 = st.columns(3)
+            with selection_col1:
+                st.info(f"""
+                        **Características del Vino Analizado**
+                        - Rating={fixed_rating}
+                        - Precio del Vino={fixed_price}
+                        """)
+            with selection_col2:
+                st.info(f"""
+                        **Parámetros del Usuario**
+                        - Precio Mínimo={test_user_min_price}
+                        - Precio Máximo={test_user_max_price}
+                        """)
+            with selection_col3:
+                st.info(f"""
+                        **Hiperparámetros de Curvas:**
+                        - Umbral Rating={test_rating_threshold}
+                        - Sensibilidad al Precio={test_price_sensitivity}
+                        """)
+
             # Generar datos para gráficos
             prices = np.linspace(5, 100, 200)
             ratings = np.linspace(1.0, 5.0, 200)
@@ -1082,21 +1117,18 @@ def show_synthetic_user_modeling():
             with calc_col3:
                 st.metric("Contribución al Score Total", f"{calculated_score * default_weights['wine_popularity']:.3f}")
 
-        elif viz_type == "Similitud de Usuario (Fuzzy Distance)":
+        elif viz_type == "Similitud con Gustos del Usuario":
             st.markdown("#### 🎯 Análisis de Similitud Fuzzy")
             
-            # Parámetros específicos
-            fuzzy_col1, fuzzy_col2 = st.columns(2)
-            
-            with fuzzy_col1:
-                q_low = st.slider("Rango de Preferencia - Mínimo", 0.0, 1.0, 0.5, 0.01)
-                q_high = st.slider("Rango de Preferencia - Máximo", q_low, 1.0, 0.5, 0.01)
-                
-            with fuzzy_col2:
-                slope_factor = st.slider("Factor de Pendiente (Rigidez)", 1, 30, 13)
+            selection_col1, selection_col2, selection_col3 = st.columns(3)
+            with selection_col1:
                 st.info(f"**Rango Preferido:** [{q_low:.2f}, {q_high:.2f}]")
+            with selection_col2:
                 st.info(f"**Ancho del Rango:** {q_high - q_low:.2f}")
-            
+            with selection_col3:
+                st.info(f"**Pendiente de la Curva:** {slope_factor}")
+
+
             # Generar datos de similitud
             values = np.linspace(0, 1.01, 100)
             similarities = [synthetic_user._fuzzy_smooth_similarity(v, q_low, q_high, slope_factor) 
@@ -1129,9 +1161,9 @@ def show_synthetic_user_modeling():
                         annotation_text="Máx Preferencia")
             
             fig.update_layout(
-                title='Score de Similitud Fuzzy vs Valor de Característica del Vino',
-                xaxis_title='Valor de Característica del Vino',
-                yaxis_title='Score de Similitud',
+                title='Score de Similitud vs Valor de Sabor del Vino',
+                xaxis_title='Valor de Sabor del Vino',
+                yaxis_title='Score de Similitud (fuzzy distance)',
                 height=500,
                 yaxis_range=[0, 1.1]
             )
@@ -1242,21 +1274,9 @@ def show_synthetic_user_modeling():
         elif viz_type == "Score Conjunto 3D":
             st.markdown("#### 📈 Visualización de Score Conjunto 3D")
             
-            # Parámetros para la superficie 3D
-            surface_col1, surface_col2 = st.columns(2)
-            
-            with surface_col1:
-                fixed_popularity = st.slider("Popularidad Fija (qty ratings)", 0, 1000, 300, 50)
-                fixed_similarity = st.slider("Similitud Fija", 0.0, 1.0, 0.8, 0.1)
-                
-            with surface_col2:
-                has_main_pairing_3d = st.checkbox("Con Main Pairing", value=True)
-                surface_resolution = st.select_slider("Resolución del Gráfico", 
-                                                    options=[20, 30, 40, 50], value=30)
-            
             # Crear meshgrid
-            price_range = np.linspace(5, min(100, test_user_min_price * 3), surface_resolution)
-            rating_range = np.linspace(1.0, 5.0, surface_resolution)
+            price_range = np.linspace(5, min(100, test_user_min_price * 3), 50)
+            rating_range = np.linspace(1.0, 5.0, 50)
             P, R = np.meshgrid(price_range, rating_range)
             Z = np.zeros_like(P)
             
@@ -1321,9 +1341,22 @@ def show_synthetic_user_modeling():
             with opt_col3:
                 st.metric("Score Máximo", f"{optimal_score:.3f}")
 
-    # Información adicional sobre los componentes
+    
+    # Mostrar los pesos por defecto de la clase
     st.markdown("---")
+    st.markdown("#### Pesos del Sistema (Default)") 
+    weight_cols = st.columns(len(default_weights))
+    for i, (component, weight) in enumerate(default_weights.items()):
+        with weight_cols[i]:
+            st.metric(
+                component.replace("_", " ").title(),
+                f"{weight:.0%}",
+                help=f"Peso por defecto para {component}"
+            )
+
+    # Información adicional sobre los componentes
     st.markdown("#### 📋 Resumen de Componentes del Sistema")
+    st.markdown("---")
 
     info_col1, info_col2 = st.columns(2)
 
@@ -1353,7 +1386,6 @@ def show_synthetic_user_modeling():
         - Se aplica cuando vino tiene ingrediente principal
         - Limitado por score máximo de 1.0
         """)
-
     
     # Selector de tipo de usuario
     user_type = st.selectbox(
