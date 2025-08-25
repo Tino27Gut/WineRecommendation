@@ -888,6 +888,11 @@ def show_synthetic_user_modeling():
     # 2. Curvas de Decisión
     st.markdown('---')
     st.markdown('<div class="subsection-header">📈 Curvas de Decisión</div>', unsafe_allow_html=True)
+    st.markdown("""
+        <div class="highlight-box">
+        <p>El usuario aplica filtros, selecciona un vino y decide si le gustó o no en base a una lógica dinámica determinada por diferentes variables: 1) Precio Calidad, 2) Similitud con sus gustos, 3) Popularidad del Vino, 4) Maridaje con su Comida.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
     wines_clean = pd.read_csv(ut.get_project_file_path("src", "data", "transformed", "wines_clean.csv"))
     meals_df = pd.read_excel(ut.get_project_file_path("src", "data", "raw", "meals", "Meals.xlsx"))
@@ -1447,122 +1452,128 @@ def show_synthetic_user_modeling():
     st.markdown('<div class="subsection-header">🔄 Simulación del Ciclo de Vida del Usuario</div>', unsafe_allow_html=True)
 
     st.markdown("""
-    ### 🧪 Modelo de Recompras de Usuario
+    #### 🧪 Modelo de Recompras de Usuario
 
     El sistema simula el comportamiento real de recompra de usuarios basado en su experiencia previa:
     """)
 
-    # Controles interactivos para los parámetros de simulación
-    sim_col1, sim_col2 = st.columns([1, 1])
+    tab3, tab4 = st.tabs(["🔄 Flujo", "⚙️ Parámetros"])
 
-    with sim_col1:
-        st.markdown("#### ⚙️ Parámetros de Simulación")
-        
-        avg_days = st.slider(
-            "📅 Días promedio entre compras", 
-            min_value=7, max_value=60, value=30,
-            help="Tiempo promedio que espera un usuario entre compras"
-        )
-        
-        std_days = st.slider(
-            "📊 Variabilidad (desviación estándar)", 
-            min_value=1, max_value=15, value=5,
-            help="Qué tan variable es el tiempo entre compras"
-        )
-        
-        max_repurchases = st.slider(
-            "🔄 Máximo de recompras por usuario", 
-            min_value=5, max_value=50, value=20,
-            help="Límite máximo de recompras que puede hacer un usuario"
-        )
+    
+    with tab4:
+        # Controles interactivos para los parámetros de simulación
+        sim_col1, sim_col2 = st.columns([1, 1])
 
-    with sim_col2:
-        st.markdown("#### 🎯 Tasas de Abandono (Churn)")
-        
-        liked_churn = st.slider(
-            "😊 Churn si le gustó el vino", 
-            min_value=0.0, max_value=0.2, value=0.05, step=0.01,
-            help="Probabilidad de abandonar después de una experiencia positiva"
-        )
-        
-        disliked_churn = st.slider(
-            "😞 Churn si NO le gustó", 
-            min_value=0.2, max_value=0.8, value=0.4, step=0.05,
-            help="Probabilidad de abandonar después de una experiencia negativa"
-        )
-        
-        # Mostrar la diferencia como insight
-        churn_difference = disliked_churn - liked_churn
-        st.markdown(f"""
-        **💡 Insight:** Los usuarios insatisfechos tienen 
-        **{churn_difference:.1%}** más probabilidad de abandonar
-        """)
-
-    # === VISUALIZACIÓN DEL PROCESO ===
-    st.markdown("#### 🔄 Flujo del Proceso de Simulación")
-
-    # Crear un diagrama de flujo visual
-    process_steps = [
-        "🎯 Usuario hace primera compra",
-        "⏱️ Tiempo de espera (distribución normal)",
-        "🤔 ¿Le gustó la experiencia anterior?",
-        "🎲 Evaluación de churn probabilístico",
-        "🛒 Nueva compra o 👋 Abandono"
-    ]
-
-    cols = st.columns(len(process_steps))
-    for i, (step, col) in enumerate(zip(process_steps, cols)):
-        with col:
-            # Diferentes colores para diferentes tipos de pasos
-            if "?" in step:
-                color = "#ffc107"  # amarillo para decisiones
-            elif "Abandono" in step:
-                color = "#dc3545"  # rojo para abandono
-            elif "Nueva compra" in step:
-                color = "#28a745"  # verde para éxito
-            else:
-                color = "#007bff"  # azul para procesos
-                
-            st.markdown(f"""
-            <div style="
-                background-color: {color};
-                color: white;
-                padding: 15px;
-                border-radius: 10px;
-                text-align: center;
-                margin: 5px;
-                font-weight: bold;
-                font-size: 0.9em;
-                min-height: 80px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            ">
-                {step}
-            </div>
-            """, unsafe_allow_html=True)
+        with sim_col1:
+            st.markdown("##### ⚙️ Parámetros de Simulación")
             
-            # Agregar flechas entre pasos (excepto el último)
-            if i < len(process_steps) - 1:
-                st.markdown(
-                    '<div style="text-align: center; font-size: 1.5em; margin: 5px;">⬇️</div>', 
-                    unsafe_allow_html=True
-                )
+            avg_days = st.slider(
+                "📅 Días promedio entre compras", 
+                min_value=7, max_value=60, value=30,
+                help="Tiempo promedio que espera un usuario entre compras"
+            )
+            
+            std_days = st.slider(
+                "📊 Variabilidad (desviación estándar)", 
+                min_value=1, max_value=15, value=5,
+                help="Qué tan variable es el tiempo entre compras"
+            )
+            
+            max_repurchases = st.slider(
+                "🔄 Máximo de recompras por usuario", 
+                min_value=5, max_value=30, value=20,
+                help="Límite máximo de recompras que puede hacer un usuario"
+            )
+
+        with sim_col2:
+            st.markdown("##### 🎯 Tasas de Abandono (Churn)")
+            
+            liked_churn = st.slider(
+                "😊 Churn si le gustó el vino", 
+                min_value=0.000, max_value=0.200, value=0.008, step=0.001,
+                help="Probabilidad de abandonar después de una experiencia positiva"
+            )
+            
+            disliked_churn = st.slider(
+                "😞 Churn si NO le gustó", 
+                min_value=0.2, max_value=1.0, value=0.65, step=0.05,
+                help="Probabilidad de abandonar después de una experiencia negativa"
+            )
+            
+            # Mostrar la diferencia como insight
+            churn_difference = disliked_churn - liked_churn
+            st.markdown(f"""
+            **💡 Insight:** Los usuarios insatisfechos tienen 
+            **{churn_difference:.1%}** más probabilidad de abandonar
+            """)
+
+    with tab3:
+        # === VISUALIZACIÓN DEL PROCESO ===
+        st.markdown("##### 🔄 Flujo del Proceso de Simulación")
+
+        # Crear un diagrama de flujo visual
+        process_steps = [
+            "🎯 Usuario hace primera compra",
+            "⏱️ Tiempo de espera (distribución normal)",
+            "🤔 ¿Le gustó la experiencia anterior?",
+            "🎲 Evaluación de churn probabilístico",
+            "🛒 Nueva compra o 👋 Abandono"
+        ]
+
+        cols = st.columns(len(process_steps))
+        for i, (step, col) in enumerate(zip(process_steps, cols)):
+            with col:
+                # Diferentes colores para diferentes tipos de pasos
+                if "?" in step:
+                    color = "#ffc107"  # amarillo para decisiones
+                elif "Abandono" in step:
+                    color = "#dc3545"  # rojo para abandono
+                elif "Nueva compra" in step:
+                    color = "#28a745"  # verde para éxito
+                else:
+                    color = "#007bff"  # azul para procesos
+                    
+                st.markdown(f"""
+                <div style="
+                    background-color: {color};
+                    color: white;
+                    padding: 15px;
+                    border-radius: 10px;
+                    text-align: center;
+                    margin: 5px;
+                    font-weight: bold;
+                    font-size: 0.9em;
+                    min-height: 80px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                ">
+                    {step}
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Agregar flechas entre pasos (excepto el último)
+                if i < len(process_steps) - 1:
+                    st.markdown(
+                        '<div style="text-align: center; font-size: 1.5em; margin: 5px;">⬇️</div>', 
+                        unsafe_allow_html=True
+                    )
 
     # === SIMULACIÓN INTERACTIVA ===
+    st.markdown("---")
     st.markdown("#### 📊 Simulación Interactiva")
 
+    # Simular un ejemplo con los parámetros actuales
     if st.button("🎲 Ejecutar Simulación de Ejemplo", type="primary"):
-        # Simular un ejemplo con los parámetros actuales
-        np.random.seed(42)  # Para resultados reproducibles
         
         # Simular serie temporal de decisiones
         days = []
         decisions = []
         current_day = 0
         likes_history = []
+        purchase_count = 0
         
-        for purchase in range(min(10, max_repurchases)):  # Limitar a 10 para visualización
+        for purchase in range(max_repurchases):
             # Simular si le gustó (70% probabilidad)
             liked = np.random.random() < 0.7
             likes_history.append(liked)
@@ -1572,7 +1583,8 @@ def show_synthetic_user_modeling():
             continues = np.random.random() > churn_prob
             
             days.append(current_day)
-            decisions.append("Continúa ✅" if continues else "Abandona ❌")
+            decisions.append("Continúa" if continues else "Abandona")
+            purchase_count += 1
             
             if not continues:
                 break
@@ -1581,34 +1593,112 @@ def show_synthetic_user_modeling():
             days_to_wait = max(1, int(np.random.normal(avg_days, std_days)))
             current_day += days_to_wait
         
-        # Crear visualización
+        # Crear visualización con múltiples trazas
         fig = go.Figure()
         
-        colors = ["green" if "Continúa" in d else "red" for d in decisions]
-        
+        # Preparar datos para visualización
+        purchase_numbers = list(range(len(days)))
+
+        # Línea conectando todas las compras
         fig.add_trace(go.Scatter(
             x=days,
-            y=list(range(len(days))),
-            mode='markers+lines',
-            marker=dict(size=15, color=colors),
-            text=decisions,
-            textposition="middle right",
-            name="Decisiones de Compra"
+            y=purchase_numbers,
+            mode='lines',
+            line=dict(color='gray', width=2, dash='dot'),
+            name="Trayectoria",
+            showlegend=False,
+            hoverinfo='skip'
         ))
+        
+        # Separar puntos por estado (continúa vs abandona)
+        continuing_indices = [i for i, d in enumerate(decisions) if d == "Continúa"]
+        abandoning_indices = [i for i, d in enumerate(decisions) if d == "Abandona"]
+        
+        # Traza para usuarios que continúan
+        if continuing_indices:
+            continuing_days = [days[i] for i in continuing_indices]
+            continuing_purchases = [purchase_numbers[i] for i in continuing_indices]
+            continuing_likes = [likes_history[i] for i in continuing_indices]
+            
+            # Colores basados en si le gustó: verde oscuro (gustó), verde claro (no gustó)
+            continuing_colors = ['#28a745' if liked else '#90EE90' for liked in continuing_likes]
+            continuing_symbols = ['circle' if liked else 'triangle-up' for liked in continuing_likes]
+            continuing_text = [f"Compra {i+1}<br>Le gustó: {'Sí' if likes_history[i] else 'No'}<br>Continúa ✅" 
+                            for i in continuing_indices]
+            
+            fig.add_trace(go.Scatter(
+                x=continuing_days,
+                y=continuing_purchases,
+                mode='markers',
+                marker=dict(
+                    size=15, 
+                    color=continuing_colors,
+                    symbol=continuing_symbols,
+                    line=dict(width=2, color='darkgreen')
+                ),
+                text=continuing_text,
+                textposition="middle right",
+                name="Usuario Continúa",
+                hovertemplate='<b>%{text}</b><br>Día: %{x}<br>Compra #: %{y}<extra></extra>'
+            ))
+        
+        # Traza para usuarios que abandonan
+        if abandoning_indices:
+            abandoning_days = [days[i] for i in abandoning_indices]
+            abandoning_purchases = [purchase_numbers[i] for i in abandoning_indices]
+            abandoning_likes = [likes_history[i] for i in abandoning_indices]
+            
+            # Colores basados en si le gustó: rojo oscuro (gustó), rojo claro (no gustó)
+            abandoning_colors = ['#dc3545' if liked else '#FFB6C1' for liked in abandoning_likes]
+            abandoning_symbols = ['circle' if liked else 'triangle-up' for liked in abandoning_likes]
+            abandoning_text = [f"Compra {i+1}<br>Le gustó: {'Sí' if likes_history[i] else 'No'}<br>Abandona ❌" 
+                            for i in abandoning_indices]
+            
+            fig.add_trace(go.Scatter(
+                x=abandoning_days,
+                y=abandoning_purchases,
+                mode='markers',
+                marker=dict(
+                    size=18, 
+                    color=abandoning_colors,
+                    symbol=abandoning_symbols,
+                    line=dict(width=3, color='darkred')
+                ),
+                text=abandoning_text,
+                textposition="middle right",
+                name="Usuario Abandona",
+                hovertemplate='<b>%{text}</b><br>Día: %{x}<br>Compra #: %{y}<extra></extra>'
+            ))
         
         fig.update_layout(
             title="📈 Simulación de Comportamiento de Usuario",
             xaxis_title="Días desde Primera Compra",
             yaxis_title="Número de Compra",
-            height=400,
-            showlegend=False
+            height=500,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            )
         )
         
         st.plotly_chart(fig, use_container_width=True)
         
+        # Leyenda explicativa
+        st.markdown("""
+        **📖 Leyenda del Gráfico:**
+        - 🟢 **Círculo Verde**: Le gustó el vino y continúa
+        - 🔼 **Triángulo Verde**: NO le gustó pero continúa
+        - 🔴 **Círculo Rojo**: Le gustó el vino pero abandona
+        - 🔺 **Triángulo Rojo**: NO le gustó y abandona
+        """)
+        
         # Mostrar estadísticas de la simulación
         total_purchases = len(days)
         abandoned = any("Abandona" in d for d in decisions)
+        liked_count = sum(likes_history)
         
         stats_col1, stats_col2, stats_col3 = st.columns(3)
         
@@ -1623,30 +1713,16 @@ def show_synthetic_user_modeling():
                 st.metric("⏱️ Promedio entre compras", "N/A")
         
         with stats_col3:
-            retention_rate = (1 - int(abandoned)) * 100
-            st.metric("📈 Tasa de Retención", f"{retention_rate}%")
+            satisfaction_rate = (liked_count / total_purchases) * 100 if total_purchases > 0 else 0
+            st.metric("😊 Tasa de Satisfacción", f"{satisfaction_rate:.1f}%")
 
-    # === INFORMACIÓN TÉCNICA ===
-    with st.expander("🔍 Detalles Técnicos del Algoritmo"):
-        st.markdown("""
-        ### Algoritmo de Simulación `simulate_user_repurchases()`
-        
-        **Parámetros principales:**
-        - `avg_days_between_purchases`: Días promedio entre compras (distribución normal)
-        - `std_days_between_purchases`: Desviación estándar de la distribución temporal  
-        - `liked_churn_rate`: Probabilidad de abandono tras experiencia positiva
-        - `disliked_churn_rate`: Probabilidad de abandono tras experiencia negativa
-        - `max_repurchases`: Límite máximo de recompras por usuario
-        
-        **Proceso iterativo:**
-        1. **Evaluación de experiencia**: Determina si al usuario le gustó la última selección
-        2. **Cálculo probabilístico de churn**: Aplica tasa de abandono correspondiente
-        3. **Decisión de continuidad**: Usuario continúa o abandona según probabilidad
-        4. **Generación temporal**: Próxima compra según distribución normal truncada
-        5. **Actualización de estado**: Preparación para siguiente iteración
-        
-        **Salida**: Historial completo de interacciones del usuario con timestamps y decisiones
-        """)
+    # === EJEMPLO DE DATOS GENERADOS ===
+    st.markdown("---")
+    st.markdown('<div class="subsection-header">🎲 Ejemplos de Datos de la Simulación</div>', unsafe_allow_html=True)
+    users_data = pd.read_pickle(ut.get_project_file_path("src", "data", "synthetic", "simulation_13.pkl"))
+    users_data = users_data.dropna()
+    users_data = users_data.head()
+    st.dataframe(users_data)
 
 
 
