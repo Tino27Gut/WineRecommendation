@@ -886,6 +886,7 @@ def show_synthetic_user_modeling():
         """)
     
     # 2. Curvas de Decisión
+    st.markdown('---')
     st.markdown('<div class="subsection-header">📈 Curvas de Decisión</div>', unsafe_allow_html=True)
 
     wines_clean = pd.read_csv(ut.get_project_file_path("src", "data", "transformed", "wines_clean.csv"))
@@ -919,7 +920,7 @@ def show_synthetic_user_modeling():
                 test_user_max_price = st.slider("Precio Máximo Usuario ($)", test_user_min_price+5, 200, 50) if test_user_max_price_enabled else None
             with analysis_col3:
                 st.markdown("###### Hiperparámetros de Curvas")
-                test_rating_threshold = st.slider("Umbral de Rating", 2.0, 4.5, 3.5, 0.1)
+                test_rating_threshold = st.slider("Umbral de Rating", 2.0, 4.5, 4.0, 0.1)
                 test_price_sensitivity = st.slider("Sensibilidad al Precio", 0.1, 2.0, 0.5, 0.1)
 
         elif viz_type == "Similitud con Gustos del Usuario":
@@ -949,7 +950,7 @@ def show_synthetic_user_modeling():
                 test_user_max_price = st.slider("Precio Máximo Usuario ($)", test_user_min_price+5, 200, 50) if test_user_max_price_enabled else None
             with analysis_col3:
                 st.markdown("###### Hiperparámetros de Curvas")
-                test_rating_threshold = st.slider("Umbral de Rating", 2.0, 4.5, 3.5, 0.1)
+                test_rating_threshold = st.slider("Umbral de Rating", 2.0, 4.5, 4.0, 0.1)
                 test_price_sensitivity = st.slider("Sensibilidad al Precio", 0.1, 2.0, 0.5, 0.1)
 
       
@@ -1275,15 +1276,15 @@ def show_synthetic_user_modeling():
             st.markdown("#### 📈 Visualización de Score Conjunto 3D")
             
             # Crear meshgrid
-            price_range = np.linspace(5, min(100, test_user_min_price * 3), 50)
+            price_range = np.linspace(5, min(200, test_user_max_price*1.5), 50)
             rating_range = np.linspace(1.0, 5.0, 50)
             P, R = np.meshgrid(price_range, rating_range)
             Z = np.zeros_like(P)
             
             # Calcular scores para cada combinación
             popularity_score = synthetic_user._calc_popularity_score(fixed_popularity)
-            main_pairing_bonus = 0.1 if has_main_pairing_3d else 0.0
-            
+            main_pairing_bonus = 1.0 if has_main_pairing_3d else 0.0
+
             for i in range(len(rating_range)):
                 for j in range(len(price_range)):
                     # Score precio-calidad
@@ -1301,6 +1302,28 @@ def show_synthetic_user_modeling():
                     )
                     
                     Z[i,j] = min(1.0, combined_score)
+
+            # Información de la selección de parámetros
+            selection_col1, selection_col2, selection_col3 = st.columns(3)
+            with selection_col1:
+                st.info(f"""
+                        **Características del Vino Analizado**
+                        - Score Popularidad = {popularity_score}
+                        - Score Similitud Gustos = {fixed_similarity}
+                        - Contiene Maridaje Principal = {"Si" if has_main_pairing_3d else "No"}
+                        """)
+            with selection_col2:
+                st.info(f"""
+                        **Parámetros del Usuario**
+                        - Precio Mínimo = {test_user_min_price}
+                        - Precio Máximo = {test_user_max_price}
+                        """)
+            with selection_col3:
+                st.info(f"""
+                        **Hiperparámetros de Curvas:**
+                        - Umbral Rating = {test_rating_threshold}
+                        - Sensibilidad al Precio = {test_price_sensitivity}
+                        """)
             
             # Crear gráfico 3D
             fig_3d = go.Figure(data=[go.Surface(
@@ -1344,301 +1367,289 @@ def show_synthetic_user_modeling():
     
     # Mostrar los pesos por defecto de la clase
     st.markdown("---")
-    st.markdown("#### Pesos del Sistema (Default)") 
-    weight_cols = st.columns(len(default_weights))
-    for i, (component, weight) in enumerate(default_weights.items()):
-        with weight_cols[i]:
-            st.metric(
-                component.replace("_", " ").title(),
-                f"{weight:.0%}",
-                help=f"Peso por defecto para {component}"
-            )
+    st.markdown('<div class="subsection-header">📋 Parámetros de la Simulación</div>', unsafe_allow_html=True)
 
-    # Información adicional sobre los componentes
-    st.markdown("#### 📋 Resumen de Componentes del Sistema")
+    # === PESOS DEL SISTEMA ===
+    st.markdown("#### 🎛️ Configuración del Motor de Recomendación")
+
+    # Crear cards más atractivos para los pesos
+    weight_container = st.container()
+    with weight_container:
+        # Crear una grid de 2x2 para los componentes
+        row1_col1, row1_col2 = st.columns(2, gap="medium")
+        row2_col1, row2_col2 = st.columns(2, gap="medium")
+        
+        components_info = [
+            {
+                "name": "precio_calidad",
+                "display_name": "🏆 Precio-Calidad",
+                "weight": default_weights["price_quality"],
+                "description": "Equilibrio entre calidad percibida y precio accesible",
+                "details": "Incremento decreciente para calidad + función binomial en precio",
+                "col": row1_col1
+            },
+            {
+                "name": "similitud_usuario", 
+                "display_name": "🎯 Similitud Usuario",
+                "weight": default_weights["user_similarity"],
+                "description": "Matching con preferencias personales del usuario",
+                "details": "Decaimiento exponencial fuera del rango preferido",
+                "col": row1_col2
+            },
+            {
+                "name": "popularidad_vino",
+                "display_name": "⭐ Popularidad",
+                "weight": default_weights["wine_popularity"],
+                "description": "Basado en cantidad de ratings de otros usuarios",
+                "details": "Función escalonada",
+                "col": row2_col1
+            },
+            {
+                "name": "main_pairing",
+                "display_name": "🍽️ Maridaje Principal", 
+                "weight": default_weights["main_pairing"],
+                "description": "Bonus por compatibilidad con ingrediente principal",
+                "details": "Bonus simple de +0.1 cuando aplica",
+                "col": row2_col2
+            }
+        ]
+        
+        for comp in components_info:
+            with comp["col"]:
+                # Card personalizado con mejor styling
+                st.markdown(f"""
+                <div style="
+                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                    border-left: 4px solid #007bff;
+                    border-radius: 10px;
+                    padding: 20px;
+                    margin: 10px 0;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                ">
+                    <h4 style="margin: 0 0 10px 0; color: #212529;">{comp["display_name"]}</h4>
+                    <div style="
+                        font-size: 2.5em; 
+                        font-weight: bold; 
+                        color: #007bff;
+                        margin: 10px 0;
+                    ">{comp["weight"]:.0%}</div>
+                    <p style="margin: 0 0 8px 0; color: #6c757d; font-size: 0.9em;">
+                        {comp["description"]}
+                    </p>
+                    <small style="color: #868e96; font-style: italic;">
+                        {comp["details"]}
+                    </small>
+                </div>
+                """, unsafe_allow_html=True)
+
+    # === SIMULACIÓN DE RECOMPRAS ===
     st.markdown("---")
+    st.markdown('<div class="subsection-header">🔄 Simulación del Ciclo de Vida del Usuario</div>', unsafe_allow_html=True)
 
-    info_col1, info_col2 = st.columns(2)
+    st.markdown("""
+    ### 🧪 Modelo de Recompras de Usuario
 
-    with info_col1:
-        st.markdown("""
-        **🏆 Precio-Calidad (40%)**
-        - Combina percepción de calidad (rating) y precio
-        - Usa función sigmoide para calidad
-        - Considera rango de precios del usuario
-        - Penaliza precios fuera del rango aceptable
-        
-        **⭐ Popularidad del Vino (15%)**
-        - Basado en cantidad de ratings
-        - Función escalonada con umbrales fijos
-        - Más ratings = mayor score de popularidad
-        """)
+    El sistema simula el comportamiento real de recompra de usuarios basado en su experiencia previa:
+    """)
 
-    with info_col2:
-        st.markdown("""
-        **🎯 Similitud de Usuario (35%)**
-        - Matching difuso con preferencias del usuario
-        - Decaimiento exponencial fuera del rango preferido
-        - Factor de pendiente controla rigidez
+    # Controles interactivos para los parámetros de simulación
+    sim_col1, sim_col2 = st.columns([1, 1])
+
+    with sim_col1:
+        st.markdown("#### ⚙️ Parámetros de Simulación")
         
-        **🍽️ Main Pairing (10%)**
-        - Bonus simple de +0.1
-        - Se aplica cuando vino tiene ingrediente principal
-        - Limitado por score máximo de 1.0
-        """)
-    
-    # Selector de tipo de usuario
-    user_type = st.selectbox(
-        "Selecciona el perfil de usuario para analizar:",
-        ["Explorador", "Conservador", "Premium", "Económico"]
-    )
-    
-    decision_col1, decision_col2 = st.columns(2)
-    
-    with decision_col1:
-        # Curva de probabilidad de compra por precio
-        price_range = np.linspace(5, 200, 100)
-        
-        # Diferentes curvas según tipo de usuario
-        if user_type == "Explorador":
-            prob_curve = 0.8 * np.exp(-((price_range - 45) / 30)**2) + 0.2
-        elif user_type == "Conservador":
-            prob_curve = 0.9 * np.exp(-((price_range - 25) / 15)**2) + 0.1
-        elif user_type == "Premium":
-            prob_curve = 0.3 + 0.6 * (1 / (1 + np.exp(-(price_range - 80) / 20)))
-        else:  # Económico
-            prob_curve = 0.9 * np.exp(-((price_range - 15) / 10)**2) + 0.05
-        
-        fig_price = go.Figure()
-        fig_price.add_trace(go.Scatter(
-            x=price_range, 
-            y=prob_curve,
-            mode='lines',
-            name=f'Usuario {user_type}',
-            line=dict(width=3)
-        ))
-        fig_price.update_layout(
-            title=f"Probabilidad de Compra vs Precio - {user_type}",
-            xaxis_title="Precio ($)",
-            yaxis_title="Probabilidad de Compra",
-            height=400
+        avg_days = st.slider(
+            "📅 Días promedio entre compras", 
+            min_value=7, max_value=60, value=30,
+            help="Tiempo promedio que espera un usuario entre compras"
         )
-        st.plotly_chart(fig_price, use_container_width=True)
-    
-    with decision_col2:
-        # Curva de satisfacción por match de sabor
-        flavor_match = np.linspace(0, 1, 100)
-        satisfaction_curve = np.power(flavor_match, 1.5)  # Curva convexa
         
-        fig_flavor = go.Figure()
-        fig_flavor.add_trace(go.Scatter(
-            x=flavor_match * 100, 
-            y=satisfaction_curve,
-            mode='lines',
-            name='Satisfacción',
-            line=dict(width=3, color='green')
-        ))
-        fig_flavor.update_layout(
-            title="Satisfacción vs Match de Perfil de Sabor",
-            xaxis_title="Match de Sabor (%)",
-            yaxis_title="Nivel de Satisfacción",
-            height=400
+        std_days = st.slider(
+            "📊 Variabilidad (desviación estándar)", 
+            min_value=1, max_value=15, value=5,
+            help="Qué tan variable es el tiempo entre compras"
         )
-        st.plotly_chart(fig_flavor, use_container_width=True)
-    
-    # 3. Simulación del Ciclo de Vida
-    st.markdown('<div class="subsection-header">🔄 Simulación del Ciclo de Vida</div>', unsafe_allow_html=True)
-    
-    lifecycle_col1, lifecycle_col2 = st.columns(2)
-    
-    with lifecycle_col1:
-        st.markdown("""
-        #### 🎯 Parámetros de Simulación:
-        """)
         
-        # Controles interactivos para la simulación
-        initial_budget = st.slider("Presupuesto Inicial ($)", 20, 200, 50)
-        risk_tolerance = st.slider("Tolerancia al Riesgo", 0.0, 1.0, 0.5, 0.1)
-        loyalty_factor = st.slider("Factor de Lealtad", 0.0, 1.0, 0.7, 0.1)
+        max_repurchases = st.slider(
+            "🔄 Máximo de recompras por usuario", 
+            min_value=5, max_value=50, value=20,
+            help="Límite máximo de recompras que puede hacer un usuario"
+        )
+
+    with sim_col2:
+        st.markdown("#### 🎯 Tasas de Abandono (Churn)")
         
+        liked_churn = st.slider(
+            "😊 Churn si le gustó el vino", 
+            min_value=0.0, max_value=0.2, value=0.05, step=0.01,
+            help="Probabilidad de abandonar después de una experiencia positiva"
+        )
+        
+        disliked_churn = st.slider(
+            "😞 Churn si NO le gustó", 
+            min_value=0.2, max_value=0.8, value=0.4, step=0.05,
+            help="Probabilidad de abandonar después de una experiencia negativa"
+        )
+        
+        # Mostrar la diferencia como insight
+        churn_difference = disliked_churn - liked_churn
         st.markdown(f"""
-        **Configuración Actual:**
-        - 💰 Presupuesto: ${initial_budget}
-        - 🎲 Riesgo: {risk_tolerance:.1f}
-        - ❤️ Lealtad: {loyalty_factor:.1f}
+        **💡 Insight:** Los usuarios insatisfechos tienen 
+        **{churn_difference:.1%}** más probabilidad de abandonar
         """)
-    
-    with lifecycle_col2:
-        # Simulación de evolución de métricas en el tiempo
-        weeks = np.arange(1, 13)  # 12 semanas
+
+    # === VISUALIZACIÓN DEL PROCESO ===
+    st.markdown("#### 🔄 Flujo del Proceso de Simulación")
+
+    # Crear un diagrama de flujo visual
+    process_steps = [
+        "🎯 Usuario hace primera compra",
+        "⏱️ Tiempo de espera (distribución normal)",
+        "🤔 ¿Le gustó la experiencia anterior?",
+        "🎲 Evaluación de churn probabilístico",
+        "🛒 Nueva compra o 👋 Abandono"
+    ]
+
+    cols = st.columns(len(process_steps))
+    for i, (step, col) in enumerate(zip(process_steps, cols)):
+        with col:
+            # Diferentes colores para diferentes tipos de pasos
+            if "?" in step:
+                color = "#ffc107"  # amarillo para decisiones
+            elif "Abandono" in step:
+                color = "#dc3545"  # rojo para abandono
+            elif "Nueva compra" in step:
+                color = "#28a745"  # verde para éxito
+            else:
+                color = "#007bff"  # azul para procesos
+                
+            st.markdown(f"""
+            <div style="
+                background-color: {color};
+                color: white;
+                padding: 15px;
+                border-radius: 10px;
+                text-align: center;
+                margin: 5px;
+                font-weight: bold;
+                font-size: 0.9em;
+                min-height: 80px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            ">
+                {step}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Agregar flechas entre pasos (excepto el último)
+            if i < len(process_steps) - 1:
+                st.markdown(
+                    '<div style="text-align: center; font-size: 1.5em; margin: 5px;">⬇️</div>', 
+                    unsafe_allow_html=True
+                )
+
+    # === SIMULACIÓN INTERACTIVA ===
+    st.markdown("#### 📊 Simulación Interactiva")
+
+    if st.button("🎲 Ejecutar Simulación de Ejemplo", type="primary"):
+        # Simular un ejemplo con los parámetros actuales
+        np.random.seed(42)  # Para resultados reproducibles
         
-        # Simular métricas basadas en parámetros
-        base_ltv = initial_budget * 0.3
-        ltv_evolution = base_ltv * (1 + loyalty_factor * 0.1) ** weeks
+        # Simular serie temporal de decisiones
+        days = []
+        decisions = []
+        current_day = 0
+        likes_history = []
         
-        churn_prob = 0.05 + (1 - loyalty_factor) * 0.15
-        retention = (1 - churn_prob) ** weeks
+        for purchase in range(min(10, max_repurchases)):  # Limitar a 10 para visualización
+            # Simular si le gustó (70% probabilidad)
+            liked = np.random.random() < 0.7
+            likes_history.append(liked)
+            
+            # Decidir si continúa basado en experiencia
+            churn_prob = liked_churn if liked else disliked_churn
+            continues = np.random.random() > churn_prob
+            
+            days.append(current_day)
+            decisions.append("Continúa ✅" if continues else "Abandona ❌")
+            
+            if not continues:
+                break
+                
+            # Calcular próximo día de compra
+            days_to_wait = max(1, int(np.random.normal(avg_days, std_days)))
+            current_day += days_to_wait
         
-        fig_lifecycle = go.Figure()
-        fig_lifecycle.add_trace(go.Scatter(
-            x=weeks, y=ltv_evolution,
-            mode='lines+markers', name='LTV ($)',
-            yaxis='y1'
+        # Crear visualización
+        fig = go.Figure()
+        
+        colors = ["green" if "Continúa" in d else "red" for d in decisions]
+        
+        fig.add_trace(go.Scatter(
+            x=days,
+            y=list(range(len(days))),
+            mode='markers+lines',
+            marker=dict(size=15, color=colors),
+            text=decisions,
+            textposition="middle right",
+            name="Decisiones de Compra"
         ))
-        fig_lifecycle.add_trace(go.Scatter(
-            x=weeks, y=retention * 100,
-            mode='lines+markers', name='Retención (%)',
-            yaxis='y2'
-        ))
         
-        fig_lifecycle.update_layout(
-            title="Evolución del Usuario en el Tiempo",
-            xaxis_title="Semanas",
-            yaxis=dict(title="LTV ($)", side="left"),
-            yaxis2=dict(title="Retención (%)", side="right", overlaying="y"),
-            height=400
+        fig.update_layout(
+            title="📈 Simulación de Comportamiento de Usuario",
+            xaxis_title="Días desde Primera Compra",
+            yaxis_title="Número de Compra",
+            height=400,
+            showlegend=False
         )
-        st.plotly_chart(fig_lifecycle, use_container_width=True)
-    
-    # 4. Métricas de Negocio
-    st.markdown('<div class="subsection-header">📊 Métricas de Negocio Simuladas</div>', unsafe_allow_html=True)
-    
-    metrics_col1, metrics_col2, metrics_col3, metrics_col4 = st.columns(4)
-    
-    # Cálculos basados en los parámetros actuales
-    avg_order_value = initial_budget * (1 + risk_tolerance * 0.3)
-    monthly_orders = 3 + loyalty_factor * 2
-    monthly_revenue = avg_order_value * monthly_orders
-    annual_ltv = monthly_revenue * 12 * retention[-1]
-    
-    with metrics_col1:
-        st.metric(
-            label="🛒 AOV",
-            value=f"${avg_order_value:.2f}",
-            delta=f"{risk_tolerance*10:.1f}%" if risk_tolerance > 0.5 else f"-{(1-risk_tolerance)*5:.1f}%"
-        )
-    
-    with metrics_col2:
-        st.metric(
-            label="📅 Pedidos/Mes",
-            value=f"{monthly_orders:.1f}",
-            delta=f"{loyalty_factor*20:.1f}%" if loyalty_factor > 0.5 else None
-        )
-    
-    with metrics_col3:
-        st.metric(
-            label="💰 Revenue Mensual",
-            value=f"${monthly_revenue:.2f}",
-            delta=f"${(monthly_revenue - initial_budget*3):.2f}"
-        )
-    
-    with metrics_col4:
-        st.metric(
-            label="⭐ LTV Anual",
-            value=f"${annual_ltv:.2f}",
-            delta=f"{retention[-1]*100:.1f}% ret."
-        )
-    
-    # Análisis What-If
-    st.markdown('<div class="subsection-header">🎲 Análisis What-If</div>', unsafe_allow_html=True)
-    
-    whatif_col1, whatif_col2 = st.columns(2)
-    
-    with whatif_col1:
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Mostrar estadísticas de la simulación
+        total_purchases = len(days)
+        abandoned = any("Abandona" in d for d in decisions)
+        
+        stats_col1, stats_col2, stats_col3 = st.columns(3)
+        
+        with stats_col1:
+            st.metric("🛒 Total de Compras", total_purchases)
+        
+        with stats_col2:
+            if total_purchases > 1:
+                avg_time_between = np.mean(np.diff(days))
+                st.metric("⏱️ Promedio entre compras", f"{avg_time_between:.1f} días")
+            else:
+                st.metric("⏱️ Promedio entre compras", "N/A")
+        
+        with stats_col3:
+            retention_rate = (1 - int(abandoned)) * 100
+            st.metric("📈 Tasa de Retención", f"{retention_rate}%")
+
+    # === INFORMACIÓN TÉCNICA ===
+    with st.expander("🔍 Detalles Técnicos del Algoritmo"):
         st.markdown("""
-        #### 📈 Escenarios de Optimización:
+        ### Algoritmo de Simulación `simulate_user_repurchases()`
+        
+        **Parámetros principales:**
+        - `avg_days_between_purchases`: Días promedio entre compras (distribución normal)
+        - `std_days_between_purchases`: Desviación estándar de la distribución temporal  
+        - `liked_churn_rate`: Probabilidad de abandono tras experiencia positiva
+        - `disliked_churn_rate`: Probabilidad de abandono tras experiencia negativa
+        - `max_repurchases`: Límite máximo de recompras por usuario
+        
+        **Proceso iterativo:**
+        1. **Evaluación de experiencia**: Determina si al usuario le gustó la última selección
+        2. **Cálculo probabilístico de churn**: Aplica tasa de abandono correspondiente
+        3. **Decisión de continuidad**: Usuario continúa o abandona según probabilidad
+        4. **Generación temporal**: Próxima compra según distribución normal truncada
+        5. **Actualización de estado**: Preparación para siguiente iteración
+        
+        **Salida**: Historial completo de interacciones del usuario con timestamps y decisiones
         """)
-        
-        # Crear diferentes escenarios
-        scenarios = {
-            'Actual': {'budget': initial_budget, 'risk': risk_tolerance, 'loyalty': loyalty_factor},
-            'Más Aventurero': {'budget': initial_budget, 'risk': min(1.0, risk_tolerance + 0.3), 'loyalty': loyalty_factor},
-            'Más Leal': {'budget': initial_budget, 'risk': risk_tolerance, 'loyalty': min(1.0, loyalty_factor + 0.2)},
-            'Premium': {'budget': initial_budget * 1.5, 'risk': risk_tolerance, 'loyalty': loyalty_factor}
-        }
-        
-        scenario_results = []
-        for name, params in scenarios.items():
-            aov = params['budget'] * (1 + params['risk'] * 0.3)
-            orders = 3 + params['loyalty'] * 2
-            ltv = aov * orders * 12 * ((1 - (0.05 + (1 - params['loyalty']) * 0.15)) ** 12)
-            scenario_results.append({'Escenario': name, 'LTV': ltv, 'AOV': aov, 'Pedidos_Mes': orders})
-        
-        scenarios_df = pd.DataFrame(scenario_results)
-        
-        fig_scenarios = px.bar(
-            scenarios_df, 
-            x='Escenario', 
-            y='LTV',
-            title="Comparación de LTV por Escenario",
-            color='LTV',
-            color_continuous_scale='viridis'
-        )
-        st.plotly_chart(fig_scenarios, use_container_width=True)
-    
-    with whatif_col2:
-        st.markdown("""
-        #### 🎯 Insights de la Simulación:
-        """)
-        
-        # Mostrar la tabla de resultados
-        st.dataframe(
-            scenarios_df.style.format({
-                'LTV': '${:.2f}',
-                'AOV': '${:.2f}',
-                'Pedidos_Mes': '{:.1f}'
-            }).highlight_max(subset=['LTV'], color='lightgreen'),
-            use_container_width=True
-        )
-        
-        # Recomendaciones automáticas
-        best_scenario = scenarios_df.loc[scenarios_df['LTV'].idxmax(), 'Escenario']
-        ltv_improvement = scenarios_df['LTV'].max() - scenarios_df.loc[scenarios_df['Escenario'] == 'Actual', 'LTV'].values[0]
-        
-        st.markdown(f"""
-        <div class="highlight-box">
-        <h5>💡 Recomendación:</h5>
-        <p>El escenario <strong>"{best_scenario}"</strong> genera el mayor LTV, 
-        con una mejora de <strong>${ltv_improvement:.2f}</strong> respecto al actual.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Validación del Modelo
-    st.markdown('<div class="subsection-header">✅ Validación del Comportamiento</div>', unsafe_allow_html=True)
-    
-    validation_col1, validation_col2 = st.columns(2)
-    
-    with validation_col1:
-        st.markdown("""
-        #### 🔍 Métricas de Realismo:
-        
-        **Comportamientos Validados:**
-        - ✅ Mayor precio → Mayor selectividad
-        - ✅ Mejor match → Mayor satisfacción
-        - ✅ Experiencias positivas → Mayor lealtad
-        - ✅ Diversidad vs Consistencia por perfil
-        
-        **Benchmarks de Industria:**
-        - Churn Rate: 15-25% (Simulado: ~12%)
-        - AOV Crecimiento: 10-20% anual
-        - Retención: 60-80% a 12 meses
-        """)
-    
-    with validation_col2:
-        # Distribución de comportamientos simulados
-        np.random.seed(42)  # Para reproducibilidad
-        simulated_purchases = np.random.beta(2, 3, 1000) * 100  # Distribución realista
-        
-        fig_dist = px.histogram(
-            x=simulated_purchases,
-            nbins=30,
-            title="Distribución de Comportamientos Simulados",
-            labels={'x': 'Score de Decisión', 'y': 'Frecuencia'}
-        )
-        fig_dist.update_layout(height=300)
-        st.plotly_chart(fig_dist, use_container_width=True)
-        
-        st.info("💡 La distribución muestra comportamientos realistas con mayor concentración en decisiones moderadas.")
+
+
+
 
 def show_modeling():
     st.markdown('<div class="section-header">🤖 Modelado y Optimización</div>', unsafe_allow_html=True)

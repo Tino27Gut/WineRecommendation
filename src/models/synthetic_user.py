@@ -371,7 +371,7 @@ class SyntheticUserSimulator:
             price: float,
             user_min_price: float,
             user_max_price: Union[float, None],
-            rating_threshold: float = 3.5,
+            rating_threshold: float = 4.0,
             price_sensitivity: float = 0.5
     ) -> float:
         """
@@ -382,7 +382,7 @@ class SyntheticUserSimulator:
         2. Componente de Precio: Evalúa la percepción del precio según el rango del usuario
 
         Lógica del Componente de Calidad:
-        - 
+        - WIP
 
         Lógica del Componente de Precio:
         - Precio < mínimo: Penalización fuerte (posible baja calidad percibida)
@@ -396,7 +396,7 @@ class SyntheticUserSimulator:
         - La penalización crece más lentamente que el precio (curva logarítmica)
         
         El score final combina ambos componentes con el mismo peso,
-        y se aplica función sigmoid para normalizar entre 0-1.
+        y se limita el valor entre 0-1.
         
         Args:
             - rating -> Rating del vino (0-5).
@@ -411,14 +411,14 @@ class SyntheticUserSimulator:
         """
         # 1. Componente de Calidad (rating normalizado respecto al threshold)
         if rating >= rating_threshold:
-            # Sigmoide: f(3.9) = 0, f(5.0) ≈ 1
+            # Función exponencial recortada (avanza valozmente desde 0.25 y se aplana en 1 aprox)
             normalized_x = (rating - rating_threshold) / (5.0 - rating_threshold)
-            sigmoid_value = 1 - np.exp(-4 * normalized_x)
-            quality_component = 0.25 + 0.75 * sigmoid_value # ajuste a mínimo 0.25
+            exp_value = 1 - np.exp(-4 * normalized_x)
+            quality_component = 0.25 + 0.75 * exp_value # ajuste a mínimo 0.25
         elif rating >= 3.0:
             # Caída de 0 a -1 (pequeña al inicio, más grande al final)
             t = (rating - 3.0) / (rating_threshold - 3.0)  # t va de 0 a 1
-            # Interpolar de -1 (en x=3.0) a 0.25 (en x=3.5)
+            # Interpolar de -1 (en x=3.0) a 0.25 (en x=4.0)
             quality_component = -1 + 1.25 * (1 - np.exp(-3 * t))
         else:
             # Lineal: f(3.0) = -1, f(1.0) = -2
