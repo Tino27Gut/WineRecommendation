@@ -885,6 +885,220 @@ def show_synthetic_user_modeling():
         ```
         """)
     
+    # Elección de comidas
+    meals_df = pd.read_excel(ut.get_project_file_path("src", "data", "raw", "meals", "Meals.xlsx"))
+
+    # === SECCIÓN ELECCIÓN DE COMIDA ===
+    st.markdown("---")
+    st.markdown('<div class="subsection-header">🍽️ Selección de Comida</div>', unsafe_allow_html=True)
+
+    st.markdown("### 🥘 Elige tu Comida Favorita")
+    st.markdown("Selecciona una comida para ver sus características de maridaje y encontrar el vino perfecto.")
+
+    # Crear selector de comida
+    available_meals = sorted(meals_df.iloc[:, 0].unique())  # Asumiendo que la primera columna tiene las comidas
+    selected_meal = st.selectbox(
+        "🍴 Selecciona una comida:",
+        options=available_meals,
+        index=0,
+        help="Elige la comida para la cual quieres encontrar el vino ideal"
+    )
+
+    if selected_meal:
+        # Obtener información de la comida seleccionada
+        meal_info = meals_df[meals_df.iloc[:, 0] == selected_meal].iloc[0]
+        
+        # Obtener el main_pairing (asumiendo que está en la columna 1)
+        main_pairing = meal_info.iloc[1] if len(meal_info) > 1 else "No especificado"
+        
+        # Obtener todas las columnas de pairings (one-hot encoded)
+        # Asumiendo que las columnas de pairings empiezan desde la columna 2
+        pairing_columns = meals_df.columns[2:]  # Columnas one-hot de pairings
+        active_pairings = [col for col in pairing_columns if meal_info[col] == 1]
+        
+        # === VISUALIZACIÓN DE LA COMIDA ===
+        food_col1, food_col2 = st.columns([1, 2])
+        
+        with food_col1:
+            # Generar imagen placeholder basada en el nombre de la comida
+            # En una implementación real, podrías usar URLs reales de imágenes
+            food_emoji_map = {
+            # Carnes rojas y derivados
+                'paté de hígado': '🥩', 'carne con salsa de champiñones': '🥩🍄', 'empanadas de carne': '🥟',
+                'guiso de arroz con carne': '🍲', 'hamburguesa con queso': '🍔', 'locro': '🍲',
+                'lomo a la mostaza': '🥩', 'milanesa de carne': '🍖', 'pastel de papa': '🥧',
+                'tacos de res': '🌮', 'ciervo estofado': '🦌', 'cordero asado': '🐑',
+                'milanesa de ternera': '🥩', "asado": "🍖",
+                
+                # Quesos y lácteos
+                'roquefort con nueces': '🧀🥜', 'tabla de quesos y embutidos': '🍱', 'fondue de queso': '🧀',
+                
+                # Pescados y mariscos
+                'trucha / salmón a la mantequilla': '🐟', 'salmón a la plancha': '🍣', 'sushi de atún': '🍣',
+                'ceviche mixto': '🍤', 'gambas al ajillo': '🦐', 'ostras frescas': '🦪', 'paella de mariscos': '🥘',
+                
+                # Pasta y risotto
+                'pasta con salsa roquefort': '🍝', 'risotto de champiñones': '🍚', 'lasagna de jamón y queso': '🍝',
+                'lasagna de verduras': '🍝', 'pasta con salsa mixta': '🍝', 'pasta con salsa de tomate': '🍝',
+                
+                # Cerdo
+                'burrito de cerdo': '🌯', 'chucrut con salchichas': '🌭', 'costillas de cerdo bbq': '🍖',
+                'matambre a la pizza': '🍕', 'tacos de cerdo': '🌮',
+                
+                # Pollo
+                'empanadas de pollo': '🥟', 'milanesa de pollo': '🍗', 'pechuga de pollo rellena': '🍗',
+                'pollo al curry': '🍛', 'pollo al horno con papas': '🍗',
+                
+                # Jamón y embutidos
+                'snacks con dips': '🧀', 'sandwich de jamón y queso': '🥪', 'empanadas de jamón y queso': '🥟',
+                
+                # Vegetarianos
+                'empanadas de verdura': '🥟', 'ensalada': '🥗', 'guiso de lentejas': '🍲',
+                'pizza napolitana': '🍕', 'sopa de cebolla': '🍲', 'sopa de calabaza': '🍲',
+                'tarta de vegetales y queso': '🥧', 'tortilla de papa': '🥚'
+            }
+            
+            # Buscar emoji apropiado
+            food_emoji = '🍽️'  # emoji por defecto
+            for key, emoji in food_emoji_map.items():
+                if key.lower() in selected_meal.lower():
+                    food_emoji = emoji
+                    break
+            
+            # Card de la comida con imagen grande
+            st.markdown(f"""
+            <div style="
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border-radius: 20px;
+                padding: 30px;
+                text-align: center;
+                color: white;
+                box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+                margin: 20px 0;
+            ">
+                <div style="font-size: 4em; margin-bottom: 15px;">{food_emoji}</div>
+                <h3 style="margin: 0; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+                    {selected_meal.title()}
+                </h3>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with food_col2:
+            # Información detallada de la comida
+            st.markdown("#### 🎯 Características de Maridaje")
+            
+            # Main pairing destacado
+            st.markdown(f"""
+            <div style="
+                background-color: #f8f9fa;
+                border-left: 5px solid #28a745;
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 5px;
+            ">
+                <h5 style="margin: 0; color: #28a745;">🌟 Ingrediente Principal</h5>
+                <p style="font-size: 1.2em; font-weight: bold; margin: 5px 0; color: #333;">
+                    {main_pairing}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Mostrar todos los pairings activos
+            if active_pairings:
+                st.markdown("#### 🧩 Ingredientes y Sabores")
+                
+                # Crear tags para los pairings usando st.columns para mejor control
+                tags_per_row = 3
+                for i in range(0, len(active_pairings), tags_per_row):
+                    cols = st.columns(tags_per_row)
+                    row_pairings = active_pairings[i:i + tags_per_row]
+                    
+                    for j, pairing in enumerate(row_pairings):
+                        clean_pairing = pairing.replace('_', ' ').title()
+                        with cols[j]:
+                            st.markdown(f"""
+                            <div style="
+                                background-color: #e3f2fd;
+                                color: #1976d2;
+                                padding: 8px 12px;
+                                border-radius: 20px;
+                                font-size: 0.9em;
+                                font-weight: 500;
+                                margin: 5px 0;
+                                text-align: center;
+                                border: 1px solid #bbdefb;
+                            ">{clean_pairing}</div>
+                            """, unsafe_allow_html=True)
+                    
+                    # Llenar columnas vacías si es necesario
+                    for k in range(len(row_pairings), tags_per_row):
+                        with cols[k]:
+                            st.empty()
+            else:
+                st.warning("No se encontraron ingredientes específicos para esta comida.")
+        
+        # === ESTADÍSTICAS DE LA COMIDA ===
+        st.markdown("#### 📊 Análisis de Complejidad")
+        
+        stats_col1, stats_col2, stats_col3 = st.columns(3)
+        
+        with stats_col1:
+            total_ingredients = len(active_pairings)
+            st.metric(
+                "🧩 Total Ingredientes", 
+                total_ingredients,
+                help="Cantidad total de ingredientes/sabores identificados"
+            )
+        
+        with stats_col2:
+            # Clasificar complejidad basada en número de ingredientes
+            if total_ingredients <= 1:
+                complexity = "Simple"
+                complexity_color = "🟢"
+            elif total_ingredients <= 2:
+                complexity = "Moderada"
+                complexity_color = "🟡"
+            else:
+                complexity = "Compleja"
+                complexity_color = "🔴"
+                
+            st.metric(
+                "⚖️ Complejidad",
+                f"{complexity_color} {complexity}",
+                help="Complejidad basada en la cantidad de sabores"
+            )
+        
+        with stats_col3:
+            # Categoría de comida (basada en palabras clave)
+            category_map = {
+                "🥩 Carnes Rojas": ["beef", "lamb", "veal", "game (deer, venison)"],
+                "🐷 Cerdo": ["pork"],
+                "🍗 Aves": ["poultry"],
+                "🐟 Pescados": ["lean fish", "rich fish (salmon, tuna etc)"],
+                "🦐 Mariscos": ["shellfish"],
+                "🧀 Quesos": ["blue cheese", "goat's milk cheese", "mature and hard cheese", "mild and soft cheese"],
+                "🥓 Embutidos": ["cured meat"],
+                "🍄 Vegetales": ["mushrooms", "vegetarian"],
+                "🍝 Pasta": ["pasta"],
+                "🌶️ Picante": ["spicy food"],
+                "🥨 Aperitivos": ["aperitif", "appetizers and snacks", "any junk food will do"]
+            }
+            
+            # Buscar categoría basada en el main_pairing
+            food_category = "🍽️ General"
+            main_pairing_lower = main_pairing.lower()
+            
+            for category, keywords in category_map.items():
+                if any(keyword.lower() in main_pairing_lower for keyword in keywords):
+                    food_category = category
+                    break
+            
+            st.metric(
+                "🏷️ Categoría",
+                food_category,
+                help=f"Categoría basada en el ingrediente principal: {main_pairing}"
+            )
+
     # 2. Curvas de Decisión
     st.markdown('---')
     st.markdown('<div class="subsection-header">📈 Curvas de Decisión</div>', unsafe_allow_html=True)
