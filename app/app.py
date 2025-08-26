@@ -1941,6 +1941,16 @@ def show_synthetic_user_modeling():
 
 
 
+
+#=====================================#
+# MODELOS DE MACHINE LEARNING
+#=====================================#
+
+
+
+
+
+
 def show_modeling():
     st.markdown('<div class="section-header">🤖 Modelado y Optimización</div>', unsafe_allow_html=True)
     
@@ -1952,45 +1962,139 @@ def show_modeling():
     with feature_eng_col1:
         st.markdown("""
         #### 🔧 Transformaciones Aplicadas:
-        - [Transformación 1 que aplicaste]
-        - [Transformación 2 que aplicaste]
-        - [Transformación 3 que aplicaste]
+        - **`LEFT JOIN`** de tabla de usuarios con la de vinos.
+        - Obtención de rangos, differencia de valor con centro del rango, mínimos, máximos de sabores y precios elegidos.
+        - Tag binario cuando un vino tiene como pairing la comida elegida por la persona.
+        - Eliminación de variables determinísticas del like (evitar data leakage).
         """)
     
     with feature_eng_col2:
         st.markdown("""
         #### 📊 Variables Creadas:
-        - [Variable nueva 1]
-        - [Variable nueva 2]
-        - [Variable nueva 3]
+        - **`métricas`** del vino seleccionado por usuario.
+        - **`range, diff, min, max`** para cada sabor y precio.
+        - **`has_user_main_pairing`**.
+        - Drop Column **`prob_like`**.
         """)
     
-    # Selección de Features
-    st.markdown('<div class="subsection-header">🎯 Selección de Features</div>', unsafe_allow_html=True)
+    # # Selección de Features
+    # st.markdown('<div class="subsection-header">🎯 Selección de Features</div>', unsafe_allow_html=True)
     
-    # Aquí mostrarías los resultados de tu feature selection
-    feature_importance_data = {
-        'Feature': ['feature_1', 'feature_2', 'feature_3', 'feature_4', 'feature_5'],
-        'Importance': [0.25, 0.22, 0.18, 0.15, 0.10],
-        'Selected': [True, True, True, False, False]
-    }
+    # # Aquí mostrarías los resultados de tu feature selection
+    # feature_importance_data = {
+    #     'Feature': ['feature_1', 'feature_2', 'feature_3', 'feature_4', 'feature_5'],
+    #     'Importance': [0.25, 0.22, 0.18, 0.15, 0.10],
+    #     'Selected': [True, True, True, False, False]
+    # }
     
-    fig_features = px.bar(
-        feature_importance_data,
-        x='Importance',
-        y='Feature',
-        color='Selected',
-        orientation='h',
-        title="Importancia de Features y Selección"
-    )
-    st.plotly_chart(fig_features, use_container_width=True)
+    # fig_features = px.bar(
+    #     feature_importance_data,
+    #     x='Importance',
+    #     y='Feature',
+    #     color='Selected',
+    #     orientation='h',
+    #     title="Importancia de Features y Selección"
+    # )
+    # st.plotly_chart(fig_features, use_container_width=True)
     
     # Modelos implementados
     st.markdown('<div class="subsection-header">🤖 Modelos Implementados</div>', unsafe_allow_html=True)
     
-    model_tabs = st.tabs(["🌳 Random Forest", "📈 Logistic Regression", "🔄 Modelo 3", "⚡ Modelo 4"])
+    model_tabs = st.tabs(["👥 K-Nearest Neighbors", "🌳 Random Forest", "📈 Logistic Regression"])
     
     with model_tabs[0]:
+        st.subheader("KNeighbors Classifier")
+
+        col_rf1, col_rf2 = st.columns([1, 2])  # un poco más de espacio para la curva
+
+        # --- Columna 1: Hiperparámetros + Features ---
+        with col_rf1:
+            st.markdown("#### ⚙️ Hiperparámetros Optimizados")
+            st.markdown("""
+            - **n_neighbors**: **`12`** 
+            - **weights**: **`uniform`**  
+            - **metric**: **`minkowski`**  
+            """)
+
+            st.markdown("#### 🧩 Features Seleccionadas")
+            st.markdown("""
+            - **method**: **`SequentialFeatureSelector`**
+            """)
+
+            selected_features = [
+                'year',
+                'rating',
+                'rating_qty',
+                'price',
+                'red fruit',
+                'has_user_main_pairing',
+                'user_body_diff',
+                'user_tannins_diff',
+                'user_sweetness_diff',
+                'user_acidity_diff',
+                'user_price_diff'
+            ]
+
+            tags_per_row = 2
+            for i in range(0, len(selected_features), tags_per_row):
+                cols = st.columns(tags_per_row)
+                row_feats = selected_features[i:i + tags_per_row]
+
+                for j, feat in enumerate(row_feats):
+                    clean_feat = feat.replace('_', ' ').title()
+                    with cols[j]:
+                        st.markdown(f"""
+                        <div style="
+                            background-color: #e3f2fd;
+                            color: #1976d2;
+                            padding: 8px 12px;
+                            border-radius: 20px;
+                            font-size: 0.9em;
+                            font-weight: 500;
+                            margin: 5px 0;
+                            text-align: center;
+                            border: 1px solid #bbdefb;
+                        ">{clean_feat}</div>
+                        """, unsafe_allow_html=True)
+
+                for k in range(len(row_feats), tags_per_row):
+                    with cols[k]:
+                        st.empty()
+
+        # --- Columna 2: Learning Curve ---
+        with col_rf2:
+            st.markdown("#### 📈 Learning Curve")
+
+            # Acá iría tu pipeline / X / y definidos antes
+            # train_size, train_scores, test_scores = learning_curve(...)
+
+            # Ejemplo fake para mostrar el gráfico
+            train_size = np.linspace(0.1, 1.0, 5) * 1000
+            train_mean = [0.65, 0.72, 0.80, 0.85, 0.88]
+            train_std = [0.02, 0.015, 0.01, 0.01, 0.005]
+            test_mean = [0.60, 0.68, 0.75, 0.78, 0.80]
+            test_std = [0.03, 0.02, 0.015, 0.01, 0.008]
+
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax.plot(train_size, train_mean, label="Train ROC-AUC", marker="o")
+            ax.fill_between(train_size,
+                            np.array(train_mean) + np.array(train_std),
+                            np.array(train_mean) - np.array(train_std),
+                            alpha=0.1)
+            ax.plot(train_size, test_mean, label="Test ROC-AUC", marker="x")
+            ax.fill_between(train_size,
+                            np.array(test_mean) + np.array(test_std),
+                            np.array(test_mean) - np.array(test_std),
+                            alpha=0.1)
+            ax.set_xlabel("Training Set Size")
+            ax.set_ylabel("ROC-AUC")
+            ax.set_title("Learning Curve")
+            ax.grid(True)
+            ax.legend()
+
+            st.pyplot(fig)
+    
+    with model_tabs[1]:
         st.markdown("#### Random Forest Classifier")
         
         col_rf1, col_rf2 = st.columns(2)
@@ -2022,7 +2126,7 @@ def show_modeling():
             fig_validation.update_layout(title="Curva de Validación - n_estimators")
             st.plotly_chart(fig_validation, use_container_width=True)
     
-    with model_tabs[1]:
+    with model_tabs[2]:
         st.markdown("#### Logistic Regression")
         
         col_lr1, col_lr2 = st.columns(2)
@@ -2039,14 +2143,6 @@ def show_modeling():
         with col_lr2:
             # Aquí pondrías tus gráficos de regularización
             st.info("Gráfico de regularización y coeficientes")
-    
-    with model_tabs[2]:
-        st.markdown("#### [Nombre de tu tercer modelo]")
-        # Repite la estructura para tus otros modelos
-    
-    with model_tabs[3]:
-        st.markdown("#### [Nombre de tu cuarto modelo (opcional)]")
-        # Si tienes un cuarto modelo
     
     # Cross-Validation
     st.markdown('<div class="subsection-header">🔄 Validación Cruzada</div>', unsafe_allow_html=True)
