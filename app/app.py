@@ -12,12 +12,27 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix
+# make_scorer source: https://scikit-learn.org/stable/modules/generated/sklearn.metrics.make_scorer.html
+from sklearn.metrics import confusion_matrix, make_scorer, roc_auc_score,  ConfusionMatrixDisplay, classification_report, get_scorer_names
+from sklearn.model_selection import StratifiedKFold, cross_validate, learning_curve, GridSearchCV, train_test_split
+from sklearn.feature_selection import RFE,  SequentialFeatureSelector
+# clone source: https://scikit-learn.org/stable/modules/generated/sklearn.base.clone.html
+from sklearn.base import clone
+from sklearn.preprocessing import FunctionTransformer
+from imblearn.pipeline import Pipeline
+
+# Statistics
+from scipy import stats
+from sklearn.preprocessing import StandardScaler
+
 import warnings
 
 from models.synthetic_user import SyntheticUserSimulator
 from src.utils import utils as ut
+from app_utils import plot_learning_curve, display_feature_tags, display_hyperparameters, plot_validation_curve_plotly, plot_feature_importance, get_complete_datasets
 
 warnings.filterwarnings('ignore')
 
@@ -1954,6 +1969,9 @@ def show_synthetic_user_modeling():
 def show_modeling():
     st.markdown('<div class="section-header">🤖 Modelado y Optimización</div>', unsafe_allow_html=True)
     
+    # Genera todos los datasets con su ETL
+    dataset_dicts = get_complete_datasets(ut)
+
     # Feature Engineering
     st.markdown('<div class="subsection-header">⚙️ Feature Engineering</div>', unsafe_allow_html=True)
     
@@ -2001,148 +2019,252 @@ def show_modeling():
     st.markdown('<div class="subsection-header">🤖 Modelos Implementados</div>', unsafe_allow_html=True)
     
     model_tabs = st.tabs(["👥 K-Nearest Neighbors", "🌳 Random Forest", "📈 Logistic Regression"])
-    
+
     with model_tabs[0]:
         st.subheader("KNeighbors Classifier")
 
-        col_rf1, col_rf2 = st.columns([1, 2])  # un poco más de espacio para la curva
+        col_rf1, col_rf2 = st.columns([1, 2])
 
         # --- Columna 1: Hiperparámetros + Features ---
         with col_rf1:
             st.markdown("#### ⚙️ Hiperparámetros Optimizados")
-            st.markdown("""
-            - **n_neighbors**: **`12`** 
-            - **weights**: **`uniform`**  
-            - **metric**: **`minkowski`**  
-            """)
-
-            st.markdown("#### 🧩 Features Seleccionadas")
-            st.markdown("""
-            - **method**: **`SequentialFeatureSelector`**
-            """)
-
-            selected_features = [
-                'year',
-                'rating',
-                'rating_qty',
-                'price',
-                'red fruit',
-                'has_user_main_pairing',
-                'user_body_diff',
-                'user_tannins_diff',
-                'user_sweetness_diff',
-                'user_acidity_diff',
-                'user_price_diff'
-            ]
-
-            tags_per_row = 2
-            for i in range(0, len(selected_features), tags_per_row):
-                cols = st.columns(tags_per_row)
-                row_feats = selected_features[i:i + tags_per_row]
-
-                for j, feat in enumerate(row_feats):
-                    clean_feat = feat.replace('_', ' ').title()
-                    with cols[j]:
-                        st.markdown(f"""
-                        <div style="
-                            background-color: #e3f2fd;
-                            color: #1976d2;
-                            padding: 8px 12px;
-                            border-radius: 20px;
-                            font-size: 0.9em;
-                            font-weight: 500;
-                            margin: 5px 0;
-                            text-align: center;
-                            border: 1px solid #bbdefb;
-                        ">{clean_feat}</div>
-                        """, unsafe_allow_html=True)
-
-                for k in range(len(row_feats), tags_per_row):
-                    with cols[k]:
-                        st.empty()
+            
+            knn_params = {
+                "n_neighbors": 12,
+                "weights": "uniform",
+                "metric": "minkowski",
+                "method": "GridSearchCV + StratifiedKFold"
+            }
+            display_hyperparameters(knn_params)
 
         # --- Columna 2: Learning Curve ---
         with col_rf2:
-            st.markdown("#### 📈 Learning Curve")
+            st.markdown("#### 🧩 Features Seleccionadas")
+            st.markdown("- **method**: SequentialFeatureSelector")
 
-            # Acá iría tu pipeline / X / y definidos antes
-            # train_size, train_scores, test_scores = learning_curve(...)
-
-            # Ejemplo fake para mostrar el gráfico
-            train_size = np.linspace(0.1, 1.0, 5) * 1000
-            train_mean = [0.65, 0.72, 0.80, 0.85, 0.88]
-            train_std = [0.02, 0.015, 0.01, 0.01, 0.005]
-            test_mean = [0.60, 0.68, 0.75, 0.78, 0.80]
-            test_std = [0.03, 0.02, 0.015, 0.01, 0.008]
-
-            fig, ax = plt.subplots(figsize=(8, 5))
-            ax.plot(train_size, train_mean, label="Train ROC-AUC", marker="o")
-            ax.fill_between(train_size,
-                            np.array(train_mean) + np.array(train_std),
-                            np.array(train_mean) - np.array(train_std),
-                            alpha=0.1)
-            ax.plot(train_size, test_mean, label="Test ROC-AUC", marker="x")
-            ax.fill_between(train_size,
-                            np.array(test_mean) + np.array(test_std),
-                            np.array(test_mean) - np.array(test_std),
-                            alpha=0.1)
-            ax.set_xlabel("Training Set Size")
-            ax.set_ylabel("ROC-AUC")
-            ax.set_title("Learning Curve")
-            ax.grid(True)
-            ax.legend()
-
-            st.pyplot(fig)
-    
-    with model_tabs[1]:
-        st.markdown("#### Random Forest Classifier")
-        
-        col_rf1, col_rf2 = st.columns(2)
-        
-        with col_rf1:
-            st.markdown("""
-            **Hiperparámetros Optimizados:**
-            - n_estimators: [valor]
-            - max_depth: [valor]
-            - min_samples_split: [valor]
-            - min_samples_leaf: [valor]
-            """)
-        
-        with col_rf2:
-            # Simulación de curva de validación
-            param_range = [10, 50, 100, 200, 300]
-            train_scores = [0.85, 0.88, 0.90, 0.89, 0.88]
-            val_scores = [0.82, 0.85, 0.87, 0.85, 0.83]
+            knn_sfs_features = [
+                'year', 'rating', 'rating_qty', 'price', 'red fruit',
+                'has_user_main_pairing', 'user_body_diff', 'user_tannins_diff',
+                'user_sweetness_diff', 'user_acidity_diff', 'user_price_diff'
+            ]
             
-            fig_validation = go.Figure()
-            fig_validation.add_trace(go.Scatter(
-                x=param_range, y=train_scores,
-                mode='lines+markers', name='Train Score'
-            ))
-            fig_validation.add_trace(go.Scatter(
-                x=param_range, y=val_scores,
-                mode='lines+markers', name='Validation Score'
-            ))
-            fig_validation.update_layout(title="Curva de Validación - n_estimators")
-            st.plotly_chart(fig_validation, use_container_width=True)
-    
+            display_feature_tags(knn_sfs_features)
+            
+
+
+        if st.button("#### Generar Learning Curve 📈"):
+            st.markdown("#### Learning Curve 📈")
+            model_df_nocat = dataset_dicts["model_df_nocat"]
+            knn_X = model_df_nocat[knn_sfs_features]
+            knn_y = model_df_nocat["liked"]
+
+            knn_pipeline = Pipeline([
+                ("scaler", StandardScaler()),
+                ("knn", KNeighborsClassifier(
+                    n_neighbors=12,
+                    weights="uniform",
+                    metric="minkowski"
+                    ))
+            ])
+
+            skf = StratifiedKFold(n_splits=5, shuffle=True)
+                
+            plot_learning_curve(
+                pipeline=knn_pipeline,
+                X=knn_X,
+                y=knn_y,
+                cv=skf,
+                model_name="KNN Classifier",
+                scoring="roc_auc"
+            )
+
+    # Código completo para las tabs de Random Forest y Logistic Regression
+    with model_tabs[1]:
+        st.subheader("Random Forest Classifier")
+
+        col_rf1, col_rf2 = st.columns([1, 2])
+
+        # --- Columna 1: Hiperparámetros + Features ---
+        with col_rf1:
+            st.markdown("#### ⚙️ Hiperparámetros Optimizados")
+            
+            # Aquí reemplaza con tus valores reales
+            rf_params = {
+                "n_estimators": 100,  # Reemplazar con tu valor
+                "max_depth": 15,      # Reemplazar con tu valor
+                "min_samples_split": 5,   # Reemplazar con tu valor
+                "min_samples_leaf": 2,    # Reemplazar con tu valor
+                "random_state": 42,
+                "method": "GridSearchCV + StratifiedKFold"
+            }
+            display_hyperparameters(rf_params)
+
+            st.markdown("#### 🧩 Features Seleccionadas")
+            st.markdown("- **method**: SequentialFeatureSelector")
+
+            # Reemplaza con tus features de RF si son diferentes a KNN
+            rf_selected_features = [
+                'year', 'rating', 'rating_qty', 'price', 'red fruit',
+                'has_user_main_pairing', 'user_body_diff', 'user_tannins_diff',
+                'user_sweetness_diff', 'user_acidity_diff', 'user_price_diff'
+            ]
+            
+            display_feature_tags(rf_selected_features)
+
+        # --- Columna 2: Visualizaciones ---
+        with col_rf2:
+            # Sub-tabs para diferentes visualizaciones
+            viz_tabs = st.tabs(["📈 Learning Curve", "🔍 Validation Curve", "📊 Feature Importance"])
+            
+            with viz_tabs[0]:
+                st.markdown("#### 📈 Learning Curve")
+            #     plot_learning_curve(
+            #         pipeline=rf_pipeline,  # Tu pipeline de RF
+            #         X=X,
+            #         y=y,
+            #         cv=skf,
+            #         model_name="Random Forest",
+            #         scoring="roc_auc"
+            #     )
+            
+            with viz_tabs[1]:
+                st.markdown("#### 🔍 Curva de Validación")
+                
+                # Selector de parámetro a validar
+                param_options = {
+                    "n_estimators": [50, 100, 150, 200, 300],
+                    "max_depth": [5, 10, 15, 20, 25, None],
+                    "min_samples_split": [2, 5, 10, 15, 20]
+                }
+                
+                selected_param = st.selectbox(
+                    "Selecciona el parámetro a validar:",
+                    list(param_options.keys()),
+                    key="rf_param_select"
+                )
+                
+                param_range = param_options[selected_param]
+                param_name = f"rf__{selected_param}"  # Ajusta según tu pipeline
+                
+                # plot_validation_curve_plotly(
+                #     pipeline=rf_pipeline,
+                #     X=X,
+                #     y=y,
+                #     cv=skf,
+                #     param_name=param_name,
+                #     param_range=param_range,
+                #     model_name="Random Forest",
+                #     scoring="roc_auc"
+                # )
+            
+            with viz_tabs[2]:
+                st.markdown("#### 📊 Importancia de Features")
+                
+                # # Asegúrate de que rf_pipeline esté entrenado
+                # if hasattr(rf_pipeline, 'named_steps') and 'rf' in rf_pipeline.named_steps:
+                #     rf_model = rf_pipeline.named_steps['rf']
+                #     plot_feature_importance(
+                #         model=rf_model,
+                #         feature_names=rf_selected_features,
+                #         model_name="Random Forest",
+                #         top_n=min(15, len(rf_selected_features))
+                #     )
+                # else:
+                #     st.info("Entrena el modelo primero para ver la importancia de features")
+
     with model_tabs[2]:
-        st.markdown("#### Logistic Regression")
-        
-        col_lr1, col_lr2 = st.columns(2)
-        
+        st.subheader("Logistic Regression")
+
+        col_lr1, col_lr2 = st.columns([1, 2])
+
+        # --- Columna 1: Hiperparámetros + Features ---
         with col_lr1:
-            st.markdown("""
-            **Hiperparámetros Optimizados:**
-            - C: [valor]
-            - penalty: [valor]
-            - solver: [valor]
-            - max_iter: [valor]
-            """)
-        
+            st.markdown("#### ⚙️ Hiperparámetros Optimizados")
+            
+            # Aquí reemplaza con tus valores reales
+            lr_params = {
+                "C": 1.0,           # Reemplazar con tu valor
+                "penalty": "l2",    # Reemplazar con tu valor
+                "solver": "liblinear",  # Reemplazar con tu valor
+                "max_iter": 1000,   # Reemplazar con tu valor
+                "random_state": 42,
+                "method": "GridSearchCV + StratifiedKFold"
+            }
+            display_hyperparameters(lr_params)
+
+            st.markdown("#### 🧩 Features Seleccionadas")
+            st.markdown("- **method**: SequentialFeatureSelector")
+
+            # Reemplaza con tus features de LR si son diferentes
+            lr_selected_features = [
+                'year', 'rating', 'rating_qty', 'price', 'red fruit',
+                'has_user_main_pairing', 'user_body_diff', 'user_tannins_diff',
+                'user_sweetness_diff', 'user_acidity_diff', 'user_price_diff'
+            ]
+            
+            display_feature_tags(lr_selected_features)
+
+        # --- Columna 2: Visualizaciones ---
         with col_lr2:
-            # Aquí pondrías tus gráficos de regularización
-            st.info("Gráfico de regularización y coeficientes")
+            # Sub-tabs para diferentes visualizaciones
+            viz_tabs_lr = st.tabs(["📈 Learning Curve", "🎯 Regularización", "📊 Coeficientes"])
+            
+            with viz_tabs_lr[0]:
+                st.markdown("#### 📈 Learning Curve")
+                plot_learning_curve(
+                    pipeline=lr_pipeline,  # Tu pipeline de LR
+                    X=X,
+                    y=y,
+                    cv=skf,
+                    model_name="Logistic Regression",
+                    scoring="roc_auc"
+                )
+            
+            with viz_tabs_lr[1]:
+                st.markdown("#### 🎯 Curva de Regularización")
+                
+                # Rango de valores C para regularización
+                C_range = [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
+                
+                plot_regularization_curve(
+                    pipeline=lr_pipeline,
+                    X=X,
+                    y=y,
+                    cv=skf,
+                    C_range=C_range,
+                    model_name="Logistic Regression"
+                )
+            
+            with viz_tabs_lr[2]:
+                st.markdown("#### 📊 Coeficientes del Modelo")
+                
+                # Mostrar coeficientes como importancia de features
+                if hasattr(lr_pipeline, 'named_steps') and 'lr' in lr_pipeline.named_steps:
+                    lr_model = lr_pipeline.named_steps['lr']
+                    plot_feature_importance(
+                        model=lr_model,
+                        feature_names=lr_selected_features,
+                        model_name="Logistic Regression",
+                        top_n=min(15, len(lr_selected_features))
+                    )
+                    
+                    # Tabla adicional con coeficientes
+                    if hasattr(lr_model, 'coef_'):
+                        import pandas as pd
+                        coef_df = pd.DataFrame({
+                            'Feature': lr_selected_features,
+                            'Coefficient': lr_model.coef_[0],
+                            'Abs_Coefficient': np.abs(lr_model.coef_[0])
+                        }).sort_values('Abs_Coefficient', ascending=False)
+                        
+                        st.markdown("##### Tabla de Coeficientes")
+                        st.dataframe(
+                            coef_df.style.format({'Coefficient': '{:.4f}', 'Abs_Coefficient': '{:.4f}'}),
+                            use_container_width=True,
+                            height=300
+                        )
+                else:
+                    st.info("Entrena el modelo primero para ver los coeficientes")
     
     # Cross-Validation
     st.markdown('<div class="subsection-header">🔄 Validación Cruzada</div>', unsafe_allow_html=True)
