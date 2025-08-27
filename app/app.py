@@ -2023,22 +2023,22 @@ def show_modeling():
     with model_tabs[0]:
         st.subheader("KNeighbors Classifier")
 
-        col_rf1, col_rf2 = st.columns([1, 2])
+        col_knn1, col_knn2 = st.columns([1, 2])
 
-        # --- Columna 1: Hiperparámetros + Features ---
-        with col_rf1:
+        # --- Columna 1: Hiperparámetros ---
+        with col_knn1:
             st.markdown("#### ⚙️ Hiperparámetros Optimizados")
             
             knn_params = {
                 "n_neighbors": 12,
                 "weights": "uniform",
                 "metric": "minkowski",
-                "method": "GridSearchCV + StratifiedKFold"
+                "method": "GridSearchCV + StratifiedKFold + ROC-AUC + EconomicScorer"
             }
             display_hyperparameters(knn_params)
 
-        # --- Columna 2: Learning Curve ---
-        with col_rf2:
+        # --- Columna 2: Features ---
+        with col_knn2:
             st.markdown("#### 🧩 Features Seleccionadas")
             st.markdown("- **method**: SequentialFeatureSelector")
 
@@ -2052,8 +2052,8 @@ def show_modeling():
             
 
 
-        if st.button("#### Generar Learning Curve 📈"):
-            st.markdown("#### Learning Curve 📈")
+        if st.button("Generar Learning Curve KNN 📈", type="primary"):
+            st.markdown("#### Learning Curve KNN 📈")
             model_df_nocat = dataset_dicts["model_df_nocat"]
             knn_X = model_df_nocat[knn_sfs_features]
             knn_y = model_df_nocat["liked"]
@@ -2078,99 +2078,122 @@ def show_modeling():
                 scoring="roc_auc"
             )
 
-    # Código completo para las tabs de Random Forest y Logistic Regression
     with model_tabs[1]:
         st.subheader("Random Forest Classifier")
 
         col_rf1, col_rf2 = st.columns([1, 2])
 
-        # --- Columna 1: Hiperparámetros + Features ---
+        # --- Columna 1: Hiperparámetros ---
         with col_rf1:
             st.markdown("#### ⚙️ Hiperparámetros Optimizados")
             
-            # Aquí reemplaza con tus valores reales
             rf_params = {
-                "n_estimators": 100,  # Reemplazar con tu valor
-                "max_depth": 15,      # Reemplazar con tu valor
-                "min_samples_split": 5,   # Reemplazar con tu valor
-                "min_samples_leaf": 2,    # Reemplazar con tu valor
-                "random_state": 42,
-                "method": "GridSearchCV + StratifiedKFold"
+                "n_estimators": 100,
+                "max_depth": 10,
+                "min_samples_split": 9,
+                "min_samples_leaf": 7,
+                "max_features": 'log2',
+                "bootstrap": "True",
+                "criterion": 'entropy',
+                "method1": "RandomizedSearchCV + StratifiedKFold + ROC-AUC + EconomicScorer",
+                "method2": "GridSearchCV Prefiltered"
             }
             display_hyperparameters(rf_params)
 
+        # --- Columna 2: Features ---
+        with col_rf2:
             st.markdown("#### 🧩 Features Seleccionadas")
-            st.markdown("- **method**: SequentialFeatureSelector")
+            st.markdown("- **method**: **`FeatureImportance`**")
 
             # Reemplaza con tus features de RF si son diferentes a KNN
-            rf_selected_features = [
-                'year', 'rating', 'rating_qty', 'price', 'red fruit',
-                'has_user_main_pairing', 'user_body_diff', 'user_tannins_diff',
-                'user_sweetness_diff', 'user_acidity_diff', 'user_price_diff'
+            rf_fisel_features = [
+                'rating_qty', 'has_user_main_pairing', 'rating', 'user_body_diff',
+                'user_acidity_diff', 'user_sweetness_diff', 'user_tannins_diff', 'user_price_diff',
+                'user_price_center','price'
             ]
             
-            display_feature_tags(rf_selected_features)
+            display_feature_tags(rf_fisel_features)
 
-        # --- Columna 2: Visualizaciones ---
-        with col_rf2:
-            # Sub-tabs para diferentes visualizaciones
-            viz_tabs = st.tabs(["📈 Learning Curve", "🔍 Validation Curve", "📊 Feature Importance"])
-            
-            with viz_tabs[0]:
-                st.markdown("#### 📈 Learning Curve")
-            #     plot_learning_curve(
-            #         pipeline=rf_pipeline,  # Tu pipeline de RF
-            #         X=X,
-            #         y=y,
-            #         cv=skf,
-            #         model_name="Random Forest",
-            #         scoring="roc_auc"
-            #     )
-            
-            with viz_tabs[1]:
-                st.markdown("#### 🔍 Curva de Validación")
-                
-                # Selector de parámetro a validar
-                param_options = {
-                    "n_estimators": [50, 100, 150, 200, 300],
-                    "max_depth": [5, 10, 15, 20, 25, None],
-                    "min_samples_split": [2, 5, 10, 15, 20]
-                }
-                
-                selected_param = st.selectbox(
-                    "Selecciona el parámetro a validar:",
-                    list(param_options.keys()),
-                    key="rf_param_select"
+        # Sub-tabs para diferentes visualizaciones
+        viz_tabs = st.tabs(["📈 Learning Curve", "📊 Feature Importance"])
+        
+        with viz_tabs[0]:
+            if st.button("Generar Learning Curve RF 📈", type="primary"):
+                st.markdown("#### Learning Curve RF 📈")
+                model_df_nocat = dataset_dicts["model_df_nocat"]
+                rf_X = model_df_nocat[rf_fisel_features]
+                rf_y = model_df_nocat["liked"]
+
+                rf_pipeline = Pipeline([
+                    ("rf", RandomForestClassifier(
+                        n_estimators=100,
+                        max_depth=10,
+                        min_samples_split=9,
+                        min_samples_leaf=7,
+                        max_features='log2',
+                        bootstrap=True,
+                        criterion='entropy'
+                    ))
+                ])
+
+                skf = StratifiedKFold(n_splits=5, shuffle=True)
+                    
+                plot_learning_curve(
+                    pipeline=rf_pipeline,
+                    X=rf_X,
+                    y=rf_y,
+                    cv=skf,
+                    model_name="RF Classifier",
+                    scoring="roc_auc"
                 )
-                
-                param_range = param_options[selected_param]
-                param_name = f"rf__{selected_param}"  # Ajusta según tu pipeline
-                
-                # plot_validation_curve_plotly(
-                #     pipeline=rf_pipeline,
-                #     X=X,
-                #     y=y,
-                #     cv=skf,
-                #     param_name=param_name,
-                #     param_range=param_range,
-                #     model_name="Random Forest",
-                #     scoring="roc_auc"
-                # )
+        
+        with viz_tabs[1]:
+            if st.button("📊 Visualizar Importancia de Features", type="primary"):
+                with st.spinner(f'Generando visualización para RF Classifier...'):
+                    st.markdown("#### 📊 Importancia de Features")
+                    model_df_nocat = dataset_dicts["model_df_nocat"]
+                    fisel_rf_X = model_df_nocat[rf_fisel_features]
+                    fisel_rf_y = model_df_nocat["liked"]
+
+                    fisel_rf_X_train, _, fisel_rf_y_train, _ = train_test_split(fisel_rf_X, fisel_rf_y, test_size=0.2, random_state=0, stratify=fisel_rf_y)
+
+                    fisel_rf = RandomForestClassifier()
+
+                    fisel_rf.fit(fisel_rf_X_train, fisel_rf_y_train)
+
+                    #  DataFrame de Feature Importance
+                    feature_importance = pd.DataFrame({
+                        "features": fisel_rf_X.columns,
+                        "importance": fisel_rf.feature_importances_
+                    }).sort_values(by="importance", ascending=False)
+
+                    feature_importance = feature_importance.reset_index(drop=True)
+
+                    # Plot interactivo
+                    fig = px.bar(
+                        feature_importance,
+                        x="importance",
+                        y="features",
+                        orientation="h",
+                        title="Random Forest - Feature Importance",
+                        labels={"importance": "Importancia", "features": "Features"}
+                    )
+                    fig.update_layout(yaxis={'categoryorder': 'total ascending'})  # Ordena las barras
+
+                    st.plotly_chart(fig, use_container_width=True)
+                    st.success("Visualización Generada ✅")
             
-            with viz_tabs[2]:
-                st.markdown("#### 📊 Importancia de Features")
-                
-                # # Asegúrate de que rf_pipeline esté entrenado
-                # if hasattr(rf_pipeline, 'named_steps') and 'rf' in rf_pipeline.named_steps:
-                #     rf_model = rf_pipeline.named_steps['rf']
-                #     plot_feature_importance(
-                #         model=rf_model,
-                #         feature_names=rf_selected_features,
-                #         model_name="Random Forest",
-                #         top_n=min(15, len(rf_selected_features))
-                #     )
-                # else:
-                #     st.info("Entrena el modelo primero para ver la importancia de features")
+            # # Asegúrate de que rf_pipeline esté entrenado
+            # if hasattr(rf_pipeline, 'named_steps') and 'rf' in rf_pipeline.named_steps:
+            #     rf_model = rf_pipeline.named_steps['rf']
+            #     plot_feature_importance(
+            #         model=rf_model,
+            #         feature_names=rf_selected_features,
+            #         model_name="Random Forest",
+            #         top_n=min(15, len(rf_selected_features))
+            #     )
+            # else:
+            #     st.info("Entrena el modelo primero para ver la importancia de features")
 
     with model_tabs[2]:
         st.subheader("Logistic Regression")
@@ -2211,14 +2234,14 @@ def show_modeling():
             
             with viz_tabs_lr[0]:
                 st.markdown("#### 📈 Learning Curve")
-                plot_learning_curve(
-                    pipeline=lr_pipeline,  # Tu pipeline de LR
-                    X=X,
-                    y=y,
-                    cv=skf,
-                    model_name="Logistic Regression",
-                    scoring="roc_auc"
-                )
+                # plot_learning_curve(
+                #     pipeline=lr_pipeline,  # Tu pipeline de LR
+                #     X=X,
+                #     y=y,
+                #     cv=skf,
+                #     model_name="Logistic Regression",
+                #     scoring="roc_auc"
+                # )
             
             with viz_tabs_lr[1]:
                 st.markdown("#### 🎯 Curva de Regularización")
@@ -2226,45 +2249,47 @@ def show_modeling():
                 # Rango de valores C para regularización
                 C_range = [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
                 
-                plot_regularization_curve(
-                    pipeline=lr_pipeline,
-                    X=X,
-                    y=y,
-                    cv=skf,
-                    C_range=C_range,
-                    model_name="Logistic Regression"
-                )
+                # plot_regularization_curve(
+                #     pipeline=lr_pipeline,
+                #     X=X,
+                #     y=y,
+                #     cv=skf,
+                #     C_range=C_range,
+                #     model_name="Logistic Regression"
+                # )
             
             with viz_tabs_lr[2]:
                 st.markdown("#### 📊 Coeficientes del Modelo")
                 
-                # Mostrar coeficientes como importancia de features
-                if hasattr(lr_pipeline, 'named_steps') and 'lr' in lr_pipeline.named_steps:
-                    lr_model = lr_pipeline.named_steps['lr']
-                    plot_feature_importance(
-                        model=lr_model,
-                        feature_names=lr_selected_features,
-                        model_name="Logistic Regression",
-                        top_n=min(15, len(lr_selected_features))
-                    )
+                # # Mostrar coeficientes como importancia de features
+                # if hasattr(lr_pipeline, 'named_steps') and 'lr' in lr_pipeline.named_steps:
+                #     lr_model = lr_pipeline.named_steps['lr']
+                #     plot_feature_importance(
+                #         model=lr_model,
+                #         feature_names=lr_selected_features,
+                #         model_name="Logistic Regression",
+                #         top_n=min(15, len(lr_selected_features))
+                #     )
                     
-                    # Tabla adicional con coeficientes
-                    if hasattr(lr_model, 'coef_'):
-                        import pandas as pd
-                        coef_df = pd.DataFrame({
-                            'Feature': lr_selected_features,
-                            'Coefficient': lr_model.coef_[0],
-                            'Abs_Coefficient': np.abs(lr_model.coef_[0])
-                        }).sort_values('Abs_Coefficient', ascending=False)
+                #     # Tabla adicional con coeficientes
+                #     if hasattr(lr_model, 'coef_'):
+                #         import pandas as pd
+                #         coef_df = pd.DataFrame({
+                #             'Feature': lr_selected_features,
+                #             'Coefficient': lr_model.coef_[0],
+                #             'Abs_Coefficient': np.abs(lr_model.coef_[0])
+                #         }).sort_values('Abs_Coefficient', ascending=False)
                         
-                        st.markdown("##### Tabla de Coeficientes")
-                        st.dataframe(
-                            coef_df.style.format({'Coefficient': '{:.4f}', 'Abs_Coefficient': '{:.4f}'}),
-                            use_container_width=True,
-                            height=300
-                        )
-                else:
-                    st.info("Entrena el modelo primero para ver los coeficientes")
+                #         st.markdown("##### Tabla de Coeficientes")
+                #         st.dataframe(
+                #             coef_df.style.format({'Coefficient': '{:.4f}', 'Abs_Coefficient': '{:.4f}'}),
+                #             use_container_width=True,
+                #             height=300
+                #         )
+                # else:
+                #     st.info("Entrena el modelo primero para ver los coeficientes")
+
+    st.markdown("---")
     
     # Cross-Validation
     st.markdown('<div class="subsection-header">🔄 Validación Cruzada</div>', unsafe_allow_html=True)
