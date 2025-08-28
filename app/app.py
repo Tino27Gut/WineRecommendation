@@ -23,6 +23,7 @@ from sklearn.feature_selection import RFE,  SequentialFeatureSelector
 from sklearn.base import clone
 from sklearn.preprocessing import FunctionTransformer
 from imblearn.pipeline import Pipeline
+from sklearn.feature_selection import SelectKBest, f_classif
 
 # Statistics
 from scipy import stats
@@ -32,7 +33,7 @@ import warnings
 
 from models.synthetic_user import SyntheticUserSimulator
 from src.utils import utils as ut
-from app_utils import plot_learning_curve, display_feature_tags, display_hyperparameters, plot_validation_curve_plotly, plot_feature_importance, get_complete_datasets
+from app_utils import plot_learning_curve, display_feature_tags, display_hyperparameters, plot_validation_curve_plotly, plot_feature_importance, get_complete_datasets, plot_selectkbest, evaluate_pipeline
 
 warnings.filterwarnings('ignore')
 
@@ -2182,163 +2183,292 @@ def show_modeling():
 
                     st.plotly_chart(fig, use_container_width=True)
                     st.success("Visualización Generada ✅")
-            
-            # # Asegúrate de que rf_pipeline esté entrenado
-            # if hasattr(rf_pipeline, 'named_steps') and 'rf' in rf_pipeline.named_steps:
-            #     rf_model = rf_pipeline.named_steps['rf']
-            #     plot_feature_importance(
-            #         model=rf_model,
-            #         feature_names=rf_selected_features,
-            #         model_name="Random Forest",
-            #         top_n=min(15, len(rf_selected_features))
-            #     )
-            # else:
-            #     st.info("Entrena el modelo primero para ver la importancia de features")
 
     with model_tabs[2]:
         st.subheader("Logistic Regression")
 
         col_lr1, col_lr2 = st.columns([1, 2])
 
-        # --- Columna 1: Hiperparámetros + Features ---
+        # --- Columna 1: Hiperparámetros ---
         with col_lr1:
             st.markdown("#### ⚙️ Hiperparámetros Optimizados")
             
-            # Aquí reemplaza con tus valores reales
             lr_params = {
-                "C": 1.0,           # Reemplazar con tu valor
-                "penalty": "l2",    # Reemplazar con tu valor
-                "solver": "liblinear",  # Reemplazar con tu valor
-                "max_iter": 1000,   # Reemplazar con tu valor
-                "random_state": 42,
-                "method": "GridSearchCV + StratifiedKFold"
+                "C": 0.1,        
+                "penalty": "l1", 
+                "solver": "liblinear",
+                "max_iter": 100,
+                "method": "GridSearchCV + StratifiedKFold + ROC-AUC + EconomicScorer"
             }
             display_hyperparameters(lr_params)
 
+        # --- Columna 2: Features ---
+        with col_lr2:
             st.markdown("#### 🧩 Features Seleccionadas")
-            st.markdown("- **method**: SequentialFeatureSelector")
+            st.markdown("- **method**: SelectKBest")
 
             # Reemplaza con tus features de LR si son diferentes
-            lr_selected_features = [
-                'year', 'rating', 'rating_qty', 'price', 'red fruit',
-                'has_user_main_pairing', 'user_body_diff', 'user_tannins_diff',
-                'user_sweetness_diff', 'user_acidity_diff', 'user_price_diff'
+            lr_selkbest_features = [
+                'rating', 'has_user_main_pairing', 'rating_qty', 'oaky',
+                'year', 'red fruit', 'user_price_min', 'sweetness', 'black fruit',
+                'user_price_max', 'dried fruit', 'body', 'yeasty', 'user_tannins_min',
+                'user_acidity_min', 'ageing', 'user_sweetness_diff', 'citrus',
+                'vegetal', 'spices', 'user_body_diff', 'tree fruit', 'acidity',
+                'tannins', 'user_price_diff'
             ]
             
-            display_feature_tags(lr_selected_features)
+            display_feature_tags(lr_selkbest_features)
+        
+        # Sub-tabs para diferentes visualizaciones
+        viz_tabs_lr = st.tabs(["📈 Learning Curve", "📊 Selección de Mejores Features"])
+        
+        with viz_tabs_lr[0]:
+            if st.button("Generar Learning Curve LR 📈", type="primary"):
+                st.markdown("#### Learning Curve LR 📈")
+                model_df_nocat = dataset_dicts["model_df_nocat"]
+                lr_X = model_df_nocat[lr_selkbest_features]
+                lr_y = model_df_nocat["liked"]
 
-        # --- Columna 2: Visualizaciones ---
-        with col_lr2:
-            # Sub-tabs para diferentes visualizaciones
-            viz_tabs_lr = st.tabs(["📈 Learning Curve", "🎯 Regularización", "📊 Coeficientes"])
-            
-            with viz_tabs_lr[0]:
-                st.markdown("#### 📈 Learning Curve")
-                # plot_learning_curve(
-                #     pipeline=lr_pipeline,  # Tu pipeline de LR
-                #     X=X,
-                #     y=y,
-                #     cv=skf,
-                #     model_name="Logistic Regression",
-                #     scoring="roc_auc"
-                # )
-            
-            with viz_tabs_lr[1]:
-                st.markdown("#### 🎯 Curva de Regularización")
-                
-                # Rango de valores C para regularización
-                C_range = [0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
-                
-                # plot_regularization_curve(
-                #     pipeline=lr_pipeline,
-                #     X=X,
-                #     y=y,
-                #     cv=skf,
-                #     C_range=C_range,
-                #     model_name="Logistic Regression"
-                # )
-            
-            with viz_tabs_lr[2]:
-                st.markdown("#### 📊 Coeficientes del Modelo")
-                
-                # # Mostrar coeficientes como importancia de features
-                # if hasattr(lr_pipeline, 'named_steps') and 'lr' in lr_pipeline.named_steps:
-                #     lr_model = lr_pipeline.named_steps['lr']
-                #     plot_feature_importance(
-                #         model=lr_model,
-                #         feature_names=lr_selected_features,
-                #         model_name="Logistic Regression",
-                #         top_n=min(15, len(lr_selected_features))
-                #     )
+                lr_pipeline = Pipeline([
+                    ("scaler", StandardScaler()),
+                    ("lr", LogisticRegression(
+                        C=0.1,
+                        penalty="l1",
+                        solver="liblinear",
+                        max_iter=100
+                    ))
+                ])
+
+                skf = StratifiedKFold(n_splits=5, shuffle=True)
                     
-                #     # Tabla adicional con coeficientes
-                #     if hasattr(lr_model, 'coef_'):
-                #         import pandas as pd
-                #         coef_df = pd.DataFrame({
-                #             'Feature': lr_selected_features,
-                #             'Coefficient': lr_model.coef_[0],
-                #             'Abs_Coefficient': np.abs(lr_model.coef_[0])
-                #         }).sort_values('Abs_Coefficient', ascending=False)
-                        
-                #         st.markdown("##### Tabla de Coeficientes")
-                #         st.dataframe(
-                #             coef_df.style.format({'Coefficient': '{:.4f}', 'Abs_Coefficient': '{:.4f}'}),
-                #             use_container_width=True,
-                #             height=300
-                #         )
-                # else:
-                #     st.info("Entrena el modelo primero para ver los coeficientes")
+                plot_learning_curve(
+                    pipeline=lr_pipeline,
+                    X=lr_X,
+                    y=lr_y,
+                    cv=skf,
+                    model_name="LR Classifier",
+                    scoring="roc_auc"
+                )
+        
+        with viz_tabs_lr[1]:
+            if st.button("📊 Visualizar Selección de Mejores Features", type="primary"):
+                with st.spinner(f'Generando visualización para SelectKBest...'):
+                    st.markdown("#### 📊 Selección de Mejores Features")
+                    
+                    # Obtención de X e y
+                    model_df_nocat = dataset_dicts["model_df_nocat"]
+                    SelK_X = model_df_nocat.drop(columns=["liked"])
+                    SelK_y = model_df_nocat["liked"]
+
+                    # Split
+                    SelK_X_train, _, SelK_y_train, _ = train_test_split(SelK_X, SelK_y, test_size=0.2, stratify=SelK_y, random_state=0)
+
+                    # Train de selector
+                    selector = SelectKBest(score_func=f_classif, k=30)
+                    selector.fit_transform(SelK_X_train, SelK_y_train)
+
+                    # Obtención de columnas y valores
+                    selected_mask = selector.get_support()
+                    selected_features = SelK_X.columns[selected_mask]
+                    SelK_scores = selector.scores_
+                    SelK_pvalues = selector.pvalues_
+
+                    # Formateo en Data Frame
+                    features_scores = pd.DataFrame({
+                        "features": SelK_X.columns,
+                        "scores": SelK_scores,
+                        "pvalues": SelK_pvalues
+                    })
+
+                    # Selección de K
+                    features_scores = features_scores[features_scores["features"].isin(selected_features)]
+                    features_scores = features_scores.sort_values(by="scores", ascending=True)
+
+                    fig = plot_selectkbest(features_scores, highlight_features=lr_selkbest_features)
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            
+            
 
     st.markdown("---")
     
     # Cross-Validation
     st.markdown('<div class="subsection-header">🔄 Validación Cruzada</div>', unsafe_allow_html=True)
     
+    model_df_nocat = dataset_dicts["model_df_nocat"]
+
+    # Knn
+    knn_X = model_df_nocat[knn_sfs_features]
+    knn_y = model_df_nocat["liked"]
+
+    knn_pipeline = Pipeline([
+        ("scaler", StandardScaler()),
+        ("knn", KNeighborsClassifier(
+            n_neighbors=12,
+            weights="uniform",
+            metric="minkowski"
+            ))
+    ])
+
+    knn_eval = evaluate_pipeline(knn_pipeline, knn_X, knn_y)
+
+    # Rf
+    rf_X = model_df_nocat[rf_fisel_features]
+    rf_y = model_df_nocat["liked"]
+
+    rf_pipeline = Pipeline([
+        ("rf", RandomForestClassifier(
+            n_estimators=100,
+            max_depth=10,
+            min_samples_split=9,
+            min_samples_leaf=7,
+            max_features='log2',
+            bootstrap=True,
+            criterion='entropy'
+        ))
+    ])
+
+    rf_eval = evaluate_pipeline(rf_pipeline, rf_X, rf_y)
+
+    # Lr
+    lr_X = model_df_nocat[lr_selkbest_features]
+    lr_y = model_df_nocat["liked"]
+
+    lr_pipeline = Pipeline([
+        ("scaler", StandardScaler()),
+        ("lr", LogisticRegression(
+            C=0.1,
+            penalty="l1",
+            solver="liblinear",
+            max_iter=100
+        ))
+    ])
+
+    lr_eval = evaluate_pipeline(lr_pipeline, lr_X, lr_y)
+
     # Ejemplo de resultados de CV
     cv_results = {
-        'Model': ['Random Forest', 'Logistic Regression', 'Modelo 3'],
-        'CV_Mean': [0.85, 0.82, 0.80],
-        'CV_Std': [0.03, 0.04, 0.05],
-        'Train_Time': [2.3, 0.5, 1.8]
+        'Model': ['K-Nearest Neighbour', 'Random Forest', 'Logistic Regression'],
+        'CV_Mean': [knn_eval.loc["roc_auc", "Mean"], rf_eval.loc["roc_auc", "Mean"], lr_eval.loc["roc_auc", "Mean"]],
+        'CV_Std': [knn_eval.loc["roc_auc", "Std"], rf_eval.loc["roc_auc", "Std"], lr_eval.loc["roc_auc", "Std"]],
+        'CV_CoefVar': [knn_eval.loc["roc_auc", "Coef. Var"], rf_eval.loc["roc_auc", "Coef. Var"], lr_eval.loc["roc_auc", "Coef. Var"]]
     }
     
     cv_df = pd.DataFrame(cv_results)
     
     fig_cv = px.bar(
-        cv_df, x='Model', y='CV_Mean', 
-        error_y='CV_Std',
+        cv_df,
+        x="Model",
+        y="CV_Mean",
+        error_y="CV_Std",
         title="Resultados de Validación Cruzada",
-        labels={'CV_Mean': 'Score Promedio', 'Model': 'Modelo'}
+        labels={"CV_Mean": "Score Promedio", "Model": "Modelo"},
+        hover_data={"CV_CoefVar": True}  # agrega coef. var. al tooltip
     )
+
+    # Ajustar eje Y hasta 1
+    fig_cv.update_yaxes(range=[0, 1])
+
+    # Mostrar los valores arriba de cada barra
+    fig_cv.update_traces(
+        text=cv_df["CV_Mean"].round(3),  # redondear a 3 decimales
+        textposition="outside"
+    )
+
     st.plotly_chart(fig_cv, use_container_width=True)
+
     
     # Métricas de performance
     st.markdown('<div class="subsection-header">📊 Comparación de Métricas</div>', unsafe_allow_html=True)
     
     metrics_data = {
-        'Modelo': ['Random Forest', 'Logistic Regression', 'Modelo 3'],
-        'Precision': [0.85, 0.82, 0.80],
-        'Recall': [0.88, 0.85, 0.83],
-        'F1-Score': [0.86, 0.83, 0.81],
-        'ROC-AUC': [0.91, 0.88, 0.85]
+        "Modelo": ["K-Nearest Neighbour", "Random Forest", "Logistic Regression"],
+        "Precision": [
+            knn_eval.loc["precision_macro", "Mean"],
+            rf_eval.loc["precision_macro", "Mean"],
+            lr_eval.loc["precision_macro", "Mean"]
+        ],
+        "Recall": [
+            knn_eval.loc["recall_macro", "Mean"],
+            rf_eval.loc["recall_macro", "Mean"],
+            lr_eval.loc["recall_macro", "Mean"]
+        ],
+        "F1-Score": [
+            knn_eval.loc["f1_macro", "Mean"],
+            rf_eval.loc["f1_macro", "Mean"],
+            lr_eval.loc["f1_macro", "Mean"]
+        ],
+        "ROC-AUC": [
+            knn_eval.loc["roc_auc", "Mean"],
+            rf_eval.loc["roc_auc", "Mean"],
+            lr_eval.loc["roc_auc", "Mean"]
+        ]
     }
+
     
     metrics_df = pd.DataFrame(metrics_data)
     
     # Gráfico radar para comparar métricas
+    import plotly.graph_objects as go
+
+    # Calcular min y max de todas las métricas
+    all_values = metrics_df[['Precision', 'Recall', 'F1-Score', 'ROC-AUC']].values.flatten()
+    min_val = all_values.min()
+    max_val = all_values.max()
+
+    # Expandir un poco los límites para que no quede pegado
+    margin = 0.05
+    radar_min = max(0, min_val - margin)
+    radar_max = min(1, max_val + margin)
+
+    # Crear radar
     fig_radar = go.Figure()
-    
+
     for i, model in enumerate(metrics_df['Modelo']):
         fig_radar.add_trace(go.Scatterpolar(
-            r=[metrics_df.iloc[i]['Precision'], metrics_df.iloc[i]['Recall'], 
-               metrics_df.iloc[i]['F1-Score'], metrics_df.iloc[i]['ROC-AUC']],
+            r=[
+                metrics_df.iloc[i]['Precision'], 
+                metrics_df.iloc[i]['Recall'], 
+                metrics_df.iloc[i]['F1-Score'], 
+                metrics_df.iloc[i]['ROC-AUC']
+            ],
             theta=['Precision', 'Recall', 'F1-Score', 'ROC-AUC'],
             fill='toself',
             name=model
         ))
-    
-    fig_radar.update_layout(title="Comparación de Métricas por Modelo")
+
+    fig_radar.update_layout(
+        title="Comparación de Métricas por Modelo",
+        width=700,   # ancho del gráfico
+        height=700,
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[radar_min, radar_max],
+                tick0=radar_min,
+                dtick=0.02,
+                tickformat=".2f",
+                tickfont=dict(size=12)
+            )
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.1,
+            xanchor="center",
+            x=0.5
+        )
+    )
+
     st.plotly_chart(fig_radar, use_container_width=True)
+
+
+
+
+
+
+
+
 
 def show_model_selection():
     st.markdown('<div class="section-header">📈 Selección del Mejor Modelo</div>', unsafe_allow_html=True)

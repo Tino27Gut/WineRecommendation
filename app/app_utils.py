@@ -2,7 +2,10 @@
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
+import plotly.express as px
 from sklearn.model_selection import learning_curve
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold, cross_validate
 
 def plot_learning_curve(pipeline, X, y, cv, model_name="Classifier", scoring="roc_auc"):
     """
@@ -371,6 +374,52 @@ def plot_feature_importance(model, feature_names, model_name="Random Forest", to
     except Exception as e:
         st.error(f"Error al mostrar importancia de features: {str(e)}")
 
+@st.cache_data
+def plot_selectkbest(features_scores: pd.DataFrame, highlight_features: list = None):
+    """
+    Genera un gráfico interactivo de barras para mostrar la importancia de features.
+    
+    Parameters
+    ----------
+    features_scores : pd.DataFrame
+        DataFrame con columnas ["features", "scores", "pvalues"].
+    highlight_features : list, optional
+        Lista de features a resaltar en otro color. Default = None.
+    
+    Returns
+    -------
+    fig : plotly.graph_objs._figure.Figure
+        Figura de Plotly lista para mostrar en Streamlit con st.plotly_chart.
+    """
+
+    # Definir columna auxiliar para colores
+    features_scores = features_scores.copy()
+    if highlight_features:
+        features_scores["selected"] = features_scores["features"].isin(highlight_features)
+    else:
+        features_scores["selected"] = False
+
+    # Crear gráfico
+    fig = px.bar(
+        features_scores,
+        y="features",
+        x="scores",
+        color="selected",
+        color_discrete_map={True: "crimson", False: "steelblue"},
+        hover_data=["pvalues"],
+        orientation="h"
+    )
+
+    fig.update_layout(
+        title="📊 Poder predictivo de features (f_classif)",
+        xaxis_title="Score (f_classif)",
+        yaxis_title="Features",
+        legend_title="Seleccionadas",
+        height=800
+    )
+
+    return fig
+
 
 # =============================================
 # DATA LOADING AND PREPROCESSING FUNCTIONS
@@ -609,3 +658,52 @@ def get_complete_datasets(ut):
         }
         
         return datasets
+    
+
+
+def evaluate_pipeline(pipeline, X, y, scoring_metrics=None, n_splits=5, random_state=0):
+    """
+    Evalúa un pipeline con validación cruzada estratificada y devuelve un DataFrame
+    con las métricas promedio, desviación estándar y coeficiente de variación.
+    
+    Parameters
+    ----------
+    pipeline : sklearn.pipeline.Pipeline
+        Pipeline a evaluar (ej: con scaler y modelo).
+    X : pd.DataFrame o np.ndarray
+        Features de entrenamiento.
+    y : pd.Series o np.ndarray
+        Target binario o multiclase.
+    scoring_metrics : list, optional
+        Lista de métricas de sklearn para cross_validate.
+        Default = ["roc_auc", "accuracy", "precision_macro", "recall_macro", "f1_macro"].
+    n_splits : int, optional
+        Cantidad de folds para StratifiedKFold. Default = 5.
+    random_state : int, optional
+        Semilla para reproducibilidad. Default = 0.
+    
+    Returns
+    -------
+    metrics_df : pd.DataFrame
+        DataFrame con columnas ["Mean", "Std", "Coef. Var"] para cada métrica.
+    """
+    
+    if scoring_metrics is None:
+        scoring_metrics = ["roc_auc", "accuracy", "precision_macro", "recall_macro", "f1_macro"]
+
+    # Stratified K-Fold
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+
+    # Cross-validation
+    scores = cross_validate(pipeline, X, y, cv=skf, scoring=scoring_metrics)
+
+    # Agrupar resultados
+    metrics_summary = {metric: scores[f"test_{metric}"] for metric in scoring_metrics}
+
+    metrics_df = pd.DataFrame({
+        "Mean": {k: v.mean() for k, v in metrics_summary.items()},
+        "Std": {k: v.std() for k, v in metrics_summary.items()},
+        "Coef. Var": {k: v.std() / v.mean() for k, v in metrics_summary.items()}
+    })
+
+    return metrics_df
