@@ -1966,7 +1966,6 @@ def show_synthetic_user_modeling():
 
 
 
-
 def show_modeling():
     st.markdown('<div class="section-header">🤖 Modelado y Optimización</div>', unsafe_allow_html=True)
     
@@ -2466,6 +2465,10 @@ def show_modeling():
 
 
 
+#=====================================#
+# ELECCIÓN DEL MODELO
+#=====================================#
+
 
 
 
@@ -2484,29 +2487,91 @@ def show_model_selection():
     """, unsafe_allow_html=True)
     
     # Matriz de confusión económica
-    economic_col1, economic_col2 = st.columns(2)
+    #economic_col1, economic_col2 = st.columns(2)
     
-    with economic_col1:
-        st.markdown("""
-        #### 💵 Impacto Económico por Predicción:
-        - **Verdadero Positivo**: +$[valor] (beneficio por detección correcta)
-        - **Verdadero Negativo**: +$[valor] (ahorro por no intervenir incorrectamente)
-        - **Falso Positivo**: -$[valor] (costo de intervención innecesaria)
-        - **Falso Negativo**: -$[valor] (costo de oportunidad perdida)
-        """)
+
+    st.markdown("#### 💵 Impacto Económico por Predicción")
+
+    impact_container = st.container()
+    with impact_container:
+        impacts_info = [
+            {
+                "name": "TN",
+                "display_name": "✅ True Negative",
+                "description": """El modelo correctamente predijo que un vino no le gustaría al usuario, evitando una mala experiencia. El valor representa el <strong>beneficio incremental</strong> de hacer una segunda recomendación más inteligente vs. mantener al usuario en su estado actual (ya disgustado por el vino rechazado, 1 - Churn Dislike). La fórmula calcula: <strong>Valor esperado de la próxima recomendación</strong> menos el <strong>valor de retención actual</strong> tras la experiencia negativa.""",
+                "latex": r"""\text{Valor}_{TN} = \text{AvgTkt} \times 
+                \Big(( \big[ (1 - \text{Churn}_{like}) \times \text{Precision} \big] 
+                - \big[ \text{Churn}_{dislike} \times (1 - \text{Precision}) \big]) 
+                - (1 - \text{Churn}_{dislike}) \Big)""",
+                "color": "#198754"  # verde
+            },
+            {
+                "name": "FP",
+                "display_name": "❌ False Positive",
+                "description": """Se recomienda un vino que no le gusta al usuario. Esto aumenta fuertemente la probabilidad de churn, y se pierde el valor del ticket.""",
+                "latex": r"""\text{Valor}_{FP} = - \text{AvgTkt} \times \text{Churn}_{dislike}""",
+                "color": "#dc3545"  # rojo
+            },
+            {
+                "name": "FN",
+                "display_name": "❌ False Negative",
+                "description": """El modelo incorrectamente predijo que un vino no le gustaría al usuario, cuando en realidad sí le habría gustado. Se perdió una oportunidad de generar una experiencia positiva. El valor representa el <strong>costo de oportunidad</strong>: la diferencia entre el valor esperado de hacer una segunda recomendación vs. el valor de retención que ya se tiene (el usuario quedó satisfecho por accidente con el vino que "no debería gustarle").""",
+                "latex": r"""\text{Valor}_{FN} = \text{AvgTkt} \times 
+                \Big(( \big[ (1 - \text{Churn}_{like}) \times \text{Precision} \big] 
+                - \big[ \text{Churn}_{dislike} \times (1 - \text{Precision}) \big]) 
+                - (1 - \text{Churn}_{like}) \Big)""",
+                "color": "#dc3545"  # rojo
+            },
+            {
+                "name": "TP",
+                "display_name": "✅ True Positive",
+                "description": """Se recomienda un vino y al usuario le gusta. El usuario tiene mayor probabilidad de quedarse (<strong>menor churn</strong>), por lo tanto se captura el valor esperado del ticket de recompra.""",
+                "latex": r"""\text{Valor}_{TP} = \text{AvgTkt} \times (1 - \text{Churn}_{like})""",
+                "color": "#198754"  # verde
+            }
+        ]
+
+        for imp in impacts_info:
+            # Card extendida
+            st.markdown(f"""
+            <div style="
+                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                border-left: 4px solid {imp["color"]};
+                border-radius: 10px;
+                padding: 20px;
+                margin: 15px 0;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            ">
+                <h5 style="margin: 0 0 10px 0; color: #212529;">{imp["display_name"]}</h5>
+                <p style="margin: 0 0 8px 0; color: #6c757d; font-size: 0.9em;">
+                    {imp["description"]}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Fórmula renderizada con LaTeX debajo
+            st.latex(imp["latex"])
+
+    # Notas al final
+    st.markdown("---")
+    st.markdown("##### ⚠️ Notas")
+    st.markdown("- **Precisión** representa la probabilidad de que la segunda recomendación, luego de identificar una opción no recomendable, sea acertada.")
+
+
+    # with economic_col1:
     
-    with economic_col2:
-        # Matriz de confusión con valores económicos
-        confusion_economic = np.array([[150, 25], [30, 200]])  # Ejemplo
-        fig_confusion_econ = px.imshow(
-            confusion_economic,
-            text_auto=True,
-            title="Matriz de Confusión - Mejor Modelo",
-            labels=dict(x="Predicción", y="Real"),
-            x=['Negativo', 'Positivo'],
-            y=['Negativo', 'Positivo']
-        )
-        st.plotly_chart(fig_confusion_econ, use_container_width=True)
+    # with economic_col2:
+    # Matriz de confusión con valores económicos
+    confusion_economic = np.array([[150, 25], [30, 200]])  # Ejemplo
+    fig_confusion_econ = px.imshow(
+        confusion_economic,
+        text_auto=True,
+        title="Matriz de Confusión - Mejor Modelo",
+        labels=dict(x="Predicción", y="Real"),
+        x=['Negativo', 'Positivo'],
+        y=['Negativo', 'Positivo']
+    )
+    st.plotly_chart(fig_confusion_econ, use_container_width=True)
     
     # Comparación de rentabilidad
     st.markdown('<div class="subsection-header">📊 Comparación de Rentabilidad por Modelo</div>', unsafe_allow_html=True)
