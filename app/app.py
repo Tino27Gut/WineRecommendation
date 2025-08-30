@@ -1995,25 +1995,6 @@ def show_modeling():
         - Drop Column **`prob_like`**.
         """)
     
-    # # Selección de Features
-    # st.markdown('<div class="subsection-header">🎯 Selección de Features</div>', unsafe_allow_html=True)
-    
-    # # Aquí mostrarías los resultados de tu feature selection
-    # feature_importance_data = {
-    #     'Feature': ['feature_1', 'feature_2', 'feature_3', 'feature_4', 'feature_5'],
-    #     'Importance': [0.25, 0.22, 0.18, 0.15, 0.10],
-    #     'Selected': [True, True, True, False, False]
-    # }
-    
-    # fig_features = px.bar(
-    #     feature_importance_data,
-    #     x='Importance',
-    #     y='Feature',
-    #     color='Selected',
-    #     orientation='h',
-    #     title="Importancia de Features y Selección"
-    # )
-    # st.plotly_chart(fig_features, use_container_width=True)
     
     # Modelos implementados
     st.markdown('<div class="subsection-header">🤖 Modelos Implementados</div>', unsafe_allow_html=True)
@@ -2498,11 +2479,11 @@ def show_model_selection():
             {
                 "name": "TN",
                 "display_name": "✅ True Negative",
-                "description": """El modelo correctamente predijo que un vino no le gustaría al usuario, evitando una mala experiencia. El valor representa el <strong>beneficio incremental</strong> de hacer una segunda recomendación más inteligente vs. mantener al usuario en su estado actual (ya disgustado por el vino rechazado, 1 - Churn Dislike). La fórmula calcula: <strong>Valor esperado de la próxima recomendación</strong> menos el <strong>valor de retención actual</strong> tras la experiencia negativa.""",
+                "description": """El modelo correctamente predijo que un vino no le gustaría al usuario, evitando una mala experiencia. El valor representa el <strong>beneficio incremental</strong> de hacer una segunda recomendación más inteligente vs. mantener al usuario en su estado actual (ya disgustado por el vino rechazado, 1 - Churn Dislike). La fórmula calcula: <strong>Valor esperado de la próxima recomendación</strong> menos el <strong>valor de la pérdida del usuario</strong> tras la experiencia negativa.""",
                 "latex": r"""\text{Valor}_{TN} = \text{AvgTkt} \times 
                 \Big(( \big[ (1 - \text{Churn}_{like}) \times \text{Precision} \big] 
                 - \big[ \text{Churn}_{dislike} \times (1 - \text{Precision}) \big]) 
-                - (1 - \text{Churn}_{dislike}) \Big)""",
+                - (\text{Churn}_{dislike}) \Big)""",
                 "color": "#198754"  # verde
             },
             {
@@ -2557,8 +2538,34 @@ def show_model_selection():
     st.markdown("##### ⚠️ Notas")
     st.markdown("- **Precisión** representa la probabilidad de que la segunda recomendación, luego de identificar una opción no recomendable, sea acertada.")
 
+    # Obtención de datos
+    dataset_dicts = get_complete_datasets(ut)
+    model_df_nocat = dataset_dicts["model_df_nocat"]
 
-    # with economic_col1:
+    # Modelos a Comparar
+
+    # - KNN -
+    knn_sfs_features = [
+        'year', 'rating', 'rating_qty', 'price', 'red fruit',
+        'has_user_main_pairing', 'user_body_diff', 'user_tannins_diff',
+        'user_sweetness_diff', 'user_acidity_diff', 'user_price_diff'
+    ]
+
+    knn_X = model_df_nocat[knn_sfs_features]
+    knn_y = model_df_nocat["liked"]
+
+
+    knn_pipeline = Pipeline([
+        ("scaler", StandardScaler()),
+        ("knn", KNeighborsClassifier(
+            n_neighbors=12,
+            weights="uniform",
+            metric="minkowski"
+            ))
+    ])
+
+
+
     
     # with economic_col2:
     # Matriz de confusión con valores económicos

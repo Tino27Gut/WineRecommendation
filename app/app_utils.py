@@ -6,6 +6,9 @@ import plotly.express as px
 from sklearn.model_selection import learning_curve
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold, cross_validate
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, roc_auc_score
+
 
 def plot_learning_curve(pipeline, X, y, cv, model_name="Classifier", scoring="roc_auc"):
     """
@@ -269,67 +272,6 @@ def plot_validation_curve_plotly(pipeline, X, y, cv, param_name, param_range,
             st.error(f"Error al generar la curva de validación: {str(e)}")
             return None, None
 
-def plot_regularization_curve(pipeline, X, y, cv, C_range, model_name="Logistic Regression"):
-    """
-    Genera curva de regularización para Logistic Regression
-    """
-    
-    with st.spinner(f'Generando curva de regularización para {model_name}...'):
-        try:
-            train_scores, test_scores = validation_curve(
-                estimator=pipeline,
-                X=X,
-                y=y,
-                param_name='lr__C',  # Ajusta según tu pipeline
-                param_range=C_range,
-                cv=cv,
-                scoring='roc_auc',
-                n_jobs=-1
-            )
-
-            train_mean = train_scores.mean(axis=1)
-            train_std = train_scores.std(axis=1)
-            test_mean = test_scores.mean(axis=1)
-            test_std = test_scores.std(axis=1)
-
-            # Crear gráfico
-            fig = go.Figure()
-
-            fig.add_trace(go.Scatter(
-                x=C_range,
-                y=train_mean,
-                mode='lines+markers',
-                name='Train ROC-AUC',
-                line=dict(color='#1f77b4', width=2),
-                error_y=dict(type='data', array=train_std, visible=True)
-            ))
-
-            fig.add_trace(go.Scatter(
-                x=C_range,
-                y=test_mean,
-                mode='lines+markers',
-                name='Test ROC-AUC',
-                line=dict(color='#ff7f0e', width=2),
-                marker=dict(symbol='square'),
-                error_y=dict(type='data', array=test_std, visible=True)
-            ))
-
-            fig.update_layout(
-                title="Curva de Regularización (Parámetro C)",
-                xaxis_title="C (Inverso de regularización)",
-                yaxis_title="ROC-AUC Score",
-                xaxis_type="log",
-                template="plotly_white",
-                height=400
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
-            
-            return train_scores, test_scores
-            
-        except Exception as e:
-            st.error(f"Error al generar la curva de regularización: {str(e)}")
-            return None, None
 
 def plot_feature_importance(model, feature_names, model_name="Random Forest", top_n=15):
     """
@@ -658,7 +600,11 @@ def get_complete_datasets(ut):
         }
         
         return datasets
-    
+
+
+# =============================================
+# MODEL EVALUATION FUNCTIONS
+# =============================================
 
 
 def evaluate_pipeline(pipeline, X, y, scoring_metrics=None, n_splits=5, random_state=0):
@@ -707,3 +653,65 @@ def evaluate_pipeline(pipeline, X, y, scoring_metrics=None, n_splits=5, random_s
     })
 
     return metrics_df
+
+
+
+# Función auxiliar de evaluate model - Confussion Matrix Interactivo
+def plot_cm_interactive(cm, labels, title="Confusion Matrix"):
+    cm_df = pd.DataFrame(cm, index=labels, columns=labels)
+    fig = px.imshow(
+        cm_df,
+        text_auto=True,
+        color_continuous_scale="Blues",
+        title=title,
+        aspect="auto"
+    )
+    return fig
+
+# Función auxiliar de evaluate model - Classification Report Interactivo
+def classification_report_df(y_true, y_pred, labels):
+    from sklearn.metrics import classification_report
+    report_dict = classification_report(y_true, y_pred, output_dict=True, target_names=labels)
+    df_report = pd.DataFrame(report_dict).transpose().round(3)
+    return df_report
+
+# Función para evaluar modelos
+def evaluate_model(pipeline, X, y, features, avg_tkt, churn_like, churn_dislike, mod_prep, test_size=0.2, stratify=True):
+
+    # Split
+    strat = y if stratify else None
+    X_train, X_test, y_train, y_test = train_test_split(
+        X[features], y, test_size=test_size, stratify=strat
+    )
+    
+    # Fit
+    pipeline.fit(X_train, y_train)
+
+    # --- TRAIN ---
+    y_train_pred = pipeline.predict(X_train)
+    y_train_proba = pipeline.predict_proba(X_train)[:, 1]
+    cm_train = confusion_matrix(y_train, y_train_pred)
+    fig_cm_train = plot_cm_interactive(cm_train, pipeline.classes_, "Confusion Matrix - Train")
+    report_train_df = classification_report_df(y_train, y_train_pred, pipeline.classes_)
+    auc_train = roc_auc_score(y_train, y_train_proba)
+    eco_train = mod_prep.economic_score(cm_train, avg_tkt, churn_like, churn_dislike)
+
+    # --- TEST ---
+    y_test_pred = pipeline.predict(X_test)
+    y_test_proba = pipeline.predict_proba(X_test)[:, 1]
+    cm_test = confusion_matrix(y_test, y_test_pred)
+    fig_cm_test = plot_cm_interactive(cm_test, pipeline.classes_, "Confusion Matrix - Test")
+    report_test_df = classification_report_df(y_test, y_test_pred, pipeline.classes_)
+    auc_test = roc_auc_score(y_test, y_test_proba)
+    eco_test = mod_prep.economic_score(cm_test, avg_tkt, churn_like, churn_dislike)
+
+    return {
+        "fig_cm_train": fig_cm_train,
+        "fig_cm_test": fig_cm_test,
+        "report_train": report_train_df,
+        "report_test": report_test_df,
+        "auc_train": auc_train,
+        "auc_test": auc_test,
+        "eco_train": eco_train,
+        "eco_test": eco_test
+    }
