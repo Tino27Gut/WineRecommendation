@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metodología de Evaluación Económica</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .slide-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 50px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header .subtitle {
+            color: #667eea;
+            font-size: 1.3rem;
+            font-weight: 400;
+        }
+
+        .methodology-box {
+            background: linear-gradient(135deg, #f8f9ff 0%, #e8f4fd 100%);
+            border-left: 5px solid #667eea;
+            padding: 25px;
+            margin: 30px 0;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+
+        .methodology-box h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+        }
+
+        .cases-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(550px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .case-card {
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border-left: 5px solid;
+        }
+
+        .case-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        }
+
+        .case-card.positive {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border-left-color: #198754;
+        }
+
+        .case-card.negative {
+            background: linear-gradient(135deg, #f8d7da 0%, #f1aeb5 100%);
+            border-left-color: #dc3545;
+        }
+
+        .case-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .case-header h4 {
+            margin: 0;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .case-description {
+            font-size: 1rem;
+            line-height: 1.7;
+            color: #2c3e50;
+        }
+
+        .assumption-box {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border: 2px solid #ffc107;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 30px 0;
+        }
+
+        .assumption-box h3 {
+            color: #856404;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .assumption-box h3::before {
+            content: "⚠️";
+            margin-right: 10px;
+            font-size: 1.2rem;
+        }
+
+        .assumption-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .assumption-list li {
+            margin: 12px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .assumption-list li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #856404;
+            font-weight: bold;
+        }
+
+        .highlight {
+            background: linear-gradient(120deg, #a8edea 0%, #fed6e3 100%);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .formula-note {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-style: italic;
+            color: #6c757d;
+            font-size: 0.95rem;
+        }
+
+        .formula-section {
+            background: #f8f9ff;
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .formula-title {
+            color: #2c3e50;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .formula-title::before {
+            content: "📐";
+            margin-right: 8px;
+        }
+
+        .formula-display {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            color: #2c3e50;
+            overflow-x: auto;
+        }
+
+        .formula-breakdown {
+            margin-top: 15px;
+        }
+
+        .formula-breakdown h5 {
+            color: #667eea;
+            margin: 10px 0 5px 0;
+            font-size: 1rem;
+        }
+
+        .formula-breakdown ul {
+            margin: 5px 0;
+            padding-left: 20px;
+        }
+
+        .formula-breakdown li {
+            margin: 5px 0;
+            color: #2c3e50;
+            font-size: 0.95rem;
+        }
+
+        .component {
+            background: #e8f4fd;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+            color: #1864ab;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <div class="header">
+            <h1>Metodología de Evaluación Económica</h1>
+            <div class="subtitle">Análisis de Impacto de Modelos de Recomendación</div>
+        </div>
+
+        <div class="methodology-box">
+            <h3>🎯 Enfoque Metodológico: "Test Ácido"</h3>
+            <p>Esta evaluación aplica un <strong>enfoque conservador</strong> que aísla el impacto directo del modelo de recomendación, midiendo únicamente los casos donde el comportamiento del usuario es <span class="highlight">directamente atribuible</span> al desempeño del modelo.</p>
+        </div>
+
+        <div class="cases-grid">
+            <div class="case-card positive">
+                <div class="case-header">
+                    <h4>✅ True Positive (TP)</h4>
+                </div>
+                <div class="case-description">
+                    <strong>Escenario:</strong> El modelo recomienda un vino y al usuario le gusta.<br><br>
+                    <strong>Impacto:</strong> El usuario tiene mayor probabilidad de quedarse (menor churn), capturando el valor esperado del ticket de recompra.<br><br>
+                    <strong>Causalidad:</strong> La satisfacción es directamente atribuible al acierto del modelo.
+                </div>
+                
+                <div class="formula-section">
+                    <div class="formula-title">Fórmula TP</div>
+                    <div class="formula-display">
+                        Valor<sub>TP</sub> = AvgTkt × (1 - Churn<sub>like</sub>)
+                    </div>
+                    <div class="formula-breakdown">
+                        <h5>Componentes:</h5>
+                        <ul>
+                            <li><span class="component">AvgTkt</span>: Valor promedio del ticket de compra</li>
+                            <li><span class="component">(1 - Churn<sub>like</sub>)</span>: Probabilidad de que el usuario se quede tras una experiencia positiva</li>
+                        </ul>
+                        <p><strong>Interpretación:</strong> Valor directo capturado cuando el modelo acierta correctamente.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="case-card negative">
+                <div class="case-header">
+                    <h4>❌ False Positive (FP)</h4>
+                </div>
+                <div class="case-description">
+                    <strong>Escenario:</strong> El modelo recomienda un vino que no le gusta al usuario.<br><br>
+                    <strong>Impacto:</strong> Aumenta fuertemente la probabilidad de churn, perdiendo el valor del ticket.<br><br>
+                    <strong>Causalidad:</strong> La insatisfacción es directamente atribuible al error del modelo.
+                </div>
+                
+                <div class="formula-section">
+                    <div class="formula-title">Fórmula FP</div>
+                    <div class="formula-display">
+                        Valor<sub>FP</sub> = -AvgTkt × Churn<sub>dislike</sub>
+                    </div>
+                    <div class="formula-breakdown">
+                        <h5>Componentes:</h5>
+                        <ul>
+                            <li><span class="component">-AvgTkt</span>: Pérdida del valor del ticket (negativo)</li>
+                            <li><span class="component">Churn<sub>dislike</sub></span>: Probabilidad de que el usuario se vaya tras una experiencia negativa</li>
+                        </ul>
+                        <p><strong>Interpretación:</strong> Pérdida directa cuando el modelo falla y causa insatisfacción.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="case-card positive">
+                <div class="case-header">
+                    <h4>✅ True Negative (TN)</h4>
+                </div>
+                <div class="case-description">
+                    <strong>Escenario:</strong> El modelo correctamente evita recomendar un vino que no le gustaría al usuario.<br><br>
+                    <strong>Impacto:</strong> Se calcula el beneficio incremental de hacer una segunda recomendación inteligente vs. perder al usuario.<br><br>
+                    <strong>Causalidad:</strong> El beneficio proviene de la capacidad predictiva del modelo.
+                </div>
+                
+                <div class="formula-section">
+                    <div class="formula-title">Fórmula TN</div>
+                    <div class="formula-display">
+                        Valor<sub>TN</sub> = AvgTkt × [((1-Churn<sub>like</sub>)×Precision) - (Churn<sub>dislike</sub>×(1-Precision)) - (Churn<sub>dislike</sub>)]
+                    </div>
+                    <div class="formula-breakdown">
+                        <h5>Valor esperado de próxima recomendación:</h5>
+                        <ul>
+                            <li><span class="component">(1-Churn<sub>like</sub>)×Precision</span>: Valor si la próxima recomendación es exitosa</li>
+                            <li><span class="component">Churn<sub>dislike</sub>×(1-Precision)</span>: Pérdida si la próxima recomendación falla</li>
+                        </ul>
+                        <h5>Valor base actual:</h5>
+                        <ul>
+                            <li><span class="component">(Churn<sub>dislike</sub>)</span>: Valor de pérdida posible tras experiencia negativa actual</li>
+                        </ul>
+                        <p><strong>Interpretación:</strong> Beneficio incremental de hacer una segunda recomendación inteligente.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="case-card negative">
+                <div class="case-header">
+                    <h4>❌ False Negative (FN)</h4>
+                </div>
+                <div class="case-description">
+                    <strong>Escenario:</strong> El modelo incorrectamente evita recomendar un vino que sí le habría gustado al usuario.<br><br>
+                    <strong>Impacto:</strong> Se pierde una oportunidad de generar una experiencia positiva. Se calcula el costo de oportunidad vs. el estado actual (usuario accidentalmente satisfecho).<br><br>
+                    <strong>Causalidad:</strong> La pérdida de oportunidad es directamente atribuible al error del modelo.
+                </div>
+                
+                <div class="formula-section">
+                    <div class="formula-title">Fórmula FN</div>
+                    <div class="formula-display">
+                        Valor<sub>FN</sub> = AvgTkt × [((1-Churn<sub>like</sub>)×Precision) - (Churn<sub>dislike</sub>×(1-Precision)) - (1-Churn<sub>like</sub>)]
+                    </div>
+                    <div class="formula-breakdown">
+                        <h5>Valor esperado de próxima recomendación:</h5>
+                        <ul>
+                            <li><span class="component">(1-Churn<sub>like</sub>)×Precision</span>: Valor si la próxima recomendación es exitosa</li>
+                            <li><span class="component">Churn<sub>dislike</sub>×(1-Precision)</span>: Pérdida si la próxima recomendación falla</li>
+                        </ul>
+                        <h5>Valor base actual:</h5>
+                        <ul>
+                            <li><span class="component">(1-Churn<sub>like</sub>)</span>: Probabilidad de retención tras experiencia positiva accidental</li>
+                        </ul>
+                        <p><strong>Interpretación:</strong> Costo de oportunidad por no haber recomendado el vino correcto inicialmente.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="assumption-box">
+            <h3>Supuestos Metodológicos Clave</h3>
+            <ul class="assumption-list">
+                <li><strong>Relación causal directa:</strong> Asumimos que el acierto del modelo → satisfacción → retención, y error → insatisfacción → churn</li>
+                <li><strong>Exclusión de "ruido":</strong> No consideramos casos donde el usuario se va pese a buena recomendación (factores externos) o se queda pese a mala recomendación (tolerancia/lealtad independiente)</li>
+                <li><strong>Test conservador:</strong> Esta metodología proporciona una medida del "impacto puro" del modelo, sin contaminar con variables externas</li>
+                <li><strong>Enfoque en valor incremental:</strong> Para TN y FN, medimos el beneficio adicional vs. el estado base actual del usuario</li>
+            </ul>
+        </div>
+
+        <div class="formula-note">
+            💡 <strong>Nota:</strong> Esta metodología de "test ácido" permite una evaluación más rigurosa y defensible del valor real que aporta el modelo de recomendación, aislando su impacto de otros factores del negocio.
+        </div>
+    </div>
+</body>
+</html>

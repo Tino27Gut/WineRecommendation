@@ -7,7 +7,9 @@ from sklearn.model_selection import learning_curve
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold, cross_validate
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix, roc_auc_score
+from sklearn.metrics import confusion_matrix, roc_auc_score, classification_report, roc_curve, auc
+
+import src.utils.model_prep_eval as mod_prep
 
 
 def plot_learning_curve(pipeline, X, y, cv, model_name="Classifier", scoring="roc_auc"):
@@ -657,26 +659,66 @@ def evaluate_pipeline(pipeline, X, y, scoring_metrics=None, n_splits=5, random_s
 
 
 # Función auxiliar de evaluate model - Confussion Matrix Interactivo
-def plot_cm_interactive(cm, labels, title="Confusion Matrix"):
-    cm_df = pd.DataFrame(cm, index=labels, columns=labels)
+def plot_cm_interactive(cm, labels, title="", normalize=False):
+    """
+    Confusion Matrix interactiva con opción de normalización.
+    
+    Parameters
+    ----------
+    cm : array-like
+        Matriz de confusión (2D).
+    labels : list
+        Lista de clases (orden de índices/columnas).
+    title : str
+        Título del gráfico.
+    normalize : bool
+        Si True, muestra proporciones (%) en vez de valores absolutos.
+    """
+    cm = np.array(cm, dtype=float)
+    if normalize:
+        cm = cm / cm.sum()
+        cm_df = pd.DataFrame(
+            np.round(cm * 100, 1),  # porcentaje con 1 decimal
+            index=labels,
+            columns=labels
+        )
+        color_label = "Percentage (%)"
+    else:
+        cm_df = pd.DataFrame(cm, index=labels, columns=labels)
+        color_label = "Count"
+
     fig = px.imshow(
         cm_df,
         text_auto=True,
         color_continuous_scale="Blues",
         title=title,
-        aspect="auto"
+        aspect="auto",
+        labels=dict(x="Predicted label", y="True label", color=color_label)
+    )
+    
+    # ticks solo en enteros (0, 1, 2, ...)
+    fig.update_xaxes(
+        side="bottom",
+        tickmode="array",
+        tickvals=list(range(len(labels))),
+        ticktext=[str(l) for l in labels]
+    )
+    
+    fig.update_yaxes(
+        tickmode="array",
+        tickvals=list(range(len(labels))),
+        ticktext=[str(l) for l in labels]
     )
     return fig
 
 # Función auxiliar de evaluate model - Classification Report Interactivo
 def classification_report_df(y_true, y_pred, labels):
-    from sklearn.metrics import classification_report
     report_dict = classification_report(y_true, y_pred, output_dict=True, target_names=labels)
     df_report = pd.DataFrame(report_dict).transpose().round(3)
     return df_report
 
 # Función para evaluar modelos
-def evaluate_model(pipeline, X, y, features, avg_tkt, churn_like, churn_dislike, mod_prep, test_size=0.2, stratify=True):
+def evaluate_model(pipeline, X, y, features, avg_tkt, churn_like, churn_dislike, test_size=0.2, stratify=True):
 
     # Split
     strat = y if stratify else None
@@ -691,7 +733,7 @@ def evaluate_model(pipeline, X, y, features, avg_tkt, churn_like, churn_dislike,
     y_train_pred = pipeline.predict(X_train)
     y_train_proba = pipeline.predict_proba(X_train)[:, 1]
     cm_train = confusion_matrix(y_train, y_train_pred)
-    fig_cm_train = plot_cm_interactive(cm_train, pipeline.classes_, "Confusion Matrix - Train")
+    fig_cm_train = plot_cm_interactive(cm_train, pipeline.classes_, "", normalize=True)
     report_train_df = classification_report_df(y_train, y_train_pred, pipeline.classes_)
     auc_train = roc_auc_score(y_train, y_train_proba)
     eco_train = mod_prep.economic_score(cm_train, avg_tkt, churn_like, churn_dislike)
@@ -700,7 +742,7 @@ def evaluate_model(pipeline, X, y, features, avg_tkt, churn_like, churn_dislike,
     y_test_pred = pipeline.predict(X_test)
     y_test_proba = pipeline.predict_proba(X_test)[:, 1]
     cm_test = confusion_matrix(y_test, y_test_pred)
-    fig_cm_test = plot_cm_interactive(cm_test, pipeline.classes_, "Confusion Matrix - Test")
+    fig_cm_test = plot_cm_interactive(cm_test, pipeline.classes_, "", normalize=True)
     report_test_df = classification_report_df(y_test, y_test_pred, pipeline.classes_)
     auc_test = roc_auc_score(y_test, y_test_proba)
     eco_test = mod_prep.economic_score(cm_test, avg_tkt, churn_like, churn_dislike)
@@ -713,5 +755,84 @@ def evaluate_model(pipeline, X, y, features, avg_tkt, churn_like, churn_dislike,
         "auc_train": auc_train,
         "auc_test": auc_test,
         "eco_train": eco_train,
-        "eco_test": eco_test
+        "eco_test": eco_test,
+        # - Datos para la curva roc-auc
+        "y_test_true": y_test,
+        "y_test_proba": y_test_proba,
+        "y_train_true": y_train,
+        "y_train_proba": y_train_proba,
+        "pipeline": pipeline
     }
+
+
+
+
+# Función para generar y plotear la curva ROC
+def plot_roc_curve(y_true, y_proba, model_name="Random Forest", dataset="Test"):
+    """
+    Genera y plotea la curva ROC usando Plotly
+    
+    Args:
+        y_true: array con las etiquetas verdaderas (0s y 1s)
+        y_proba: array con las probabilidades predichas por el modelo
+        model_name: nombre del modelo para mostrar en el gráfico
+        dataset: tipo de dataset (Train/Test)
+    """
+    # Calcular la curva ROC
+    fpr, tpr, thresholds = roc_curve(y_true, y_proba)
+    roc_auc = auc(fpr, tpr)
+    
+    # Crear el gráfico
+    fig_roc = go.Figure()
+    
+    # Agregar la curva ROC del modelo
+    fig_roc.add_trace(go.Scatter(
+        x=fpr, 
+        y=tpr,
+        mode='lines',
+        name=f'{model_name} (AUC = {roc_auc:.3f})',
+        line=dict(width=3, color='#1f77b4'),
+        hovertemplate='<b>Threshold:</b> %{customdata:.3f}<br>' +
+                      '<b>FPR:</b> %{x:.3f}<br>' +
+                      '<b>TPR:</b> %{y:.3f}<extra></extra>',
+        customdata=thresholds
+    ))
+    
+    # Agregar línea de referencia (clasificador aleatorio)
+    fig_roc.add_trace(go.Scatter(
+        x=[0, 1], 
+        y=[0, 1],
+        mode='lines',
+        name='Clasificador Aleatorio (AUC = 0.50)',
+        line=dict(dash='dash', color='red', width=2),
+        hoverinfo='skip'
+    ))
+    
+    # Configurar el layout
+    fig_roc.update_layout(
+        title=f"Curva ROC - {model_name} ({dataset})",
+        xaxis_title="Tasa de Falsos Positivos (FPR)",
+        yaxis_title="Tasa de Verdaderos Positivos (TPR)",
+        height=600,
+        legend=dict(
+            yanchor="bottom",
+            y=0.05,
+            xanchor="right",
+            x=0.95,
+            bgcolor="rgba(255,255,255,0.8)",
+            bordercolor="Black",
+            borderwidth=1
+        ),
+        template="plotly_white",
+        hovermode='closest'
+    )
+    
+    # Asegurar que el gráfico sea cuadrado y bien proporcionado
+    fig_roc.update_xaxes(range=[0, 1], constrain="domain")
+    fig_roc.update_yaxes(range=[0, 1], scaleanchor="x", scaleratio=1)
+    
+    # Agregar grid
+    fig_roc.update_xaxes(showgrid=True, gridwidth=1, gridcolor='lightgray')
+    fig_roc.update_yaxes(showgrid=True, gridwidth=1, gridcolor='lightgray')
+    
+    return fig_roc, roc_auc
