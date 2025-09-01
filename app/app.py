@@ -35,6 +35,7 @@ import warnings
 from models.synthetic_user import SyntheticUserSimulator
 from src.utils import utils as ut
 from app_utils import plot_learning_curve, display_feature_tags, display_hyperparameters, plot_validation_curve_plotly, plot_feature_importance, get_complete_datasets, plot_selectkbest, evaluate_pipeline, evaluate_model, plot_roc_curve
+import interactive as it
 
 warnings.filterwarnings('ignore')
 
@@ -2766,257 +2767,35 @@ def show_model_selection():
         model_name="Random Forest",
         dataset="Test"
     )
-    st.plotly_chart(fig_roc_test, use_container_width=True)
-    
+    st.plotly_chart(fig_roc_test, use_container_width=True)    
+
+
+
+
+
+#=====================================#
+# APP INTERACTIVA
+#=====================================#
+
+
+
+
+
 def show_interactive_app():
-    st.markdown('<div class="section-header">⚡ Aplicación Interactiva</div>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="highlight-box">
-    <h3>🎯 Demo del Modelo en Producción</h3>
-    <p>Esta sección permite a los usuarios interactuar directamente con tu modelo entrenado, 
-    ingresando valores y obteniendo predicciones en tiempo real.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Interfaz de predicción
-    st.markdown('<div class="subsection-header">🔮 Realizar Predicción</div>', unsafe_allow_html=True)
-    
-    # Dividir en columnas para el input
-    input_col1, input_col2 = st.columns(2)
-    
-    with input_col1:
-        st.markdown("#### 📊 Variables de Entrada")
-        
-        # REEMPLAZA ESTOS INPUTS CON TUS VARIABLES REALES
-        var1 = st.slider("Variable 1", min_value=0, max_value=100, value=50)
-        var2 = st.selectbox("Variable 2", options=["Opción A", "Opción B", "Opción C"])
-        var3 = st.number_input("Variable 3", min_value=0.0, max_value=1000.0, value=100.0)
-        var4 = st.radio("Variable 4", options=["Sí", "No"])
-    
-    with input_col2:
-        st.markdown("#### ⚙️ Configuración del Modelo")
-        
-        modelo_seleccionado = st.selectbox(
-            "Modelo a usar:", 
-            ["Mejor Modelo (Random Forest)", "Modelo Alternativo", "Ensemble"]
-        )
-        
-        confianza_threshold = st.slider(
-            "Umbral de Confianza", 
-            min_value=0.1, max_value=0.9, value=0.5, step=0.05
-        )
-        
-        mostrar_probabilidades = st.checkbox("Mostrar probabilidades detalladas", value=True)
-        mostrar_explicacion = st.checkbox("Mostrar explicación de la predicción", value=True)
-    
-    # Botón de predicción
-    if st.button("🚀 Realizar Predicción", type="primary"):
-        
-        # AQUÍ INTEGRARÍAS TU MODELO REAL
-        # prediction = tu_modelo.predict([[var1, var2_encoded, var3, var4_encoded]])
-        # prediction_proba = tu_modelo.predict_proba([[var1, var2_encoded, var3, var4_encoded]])
-        
-        # Simulación de predicción - REEMPLAZAR CON TU CÓDIGO REAL
-        import random
-        prediction = random.choice([0, 1])
-        prediction_proba = [random.random(), random.random()]
-        prediction_proba = [p/sum(prediction_proba) for p in prediction_proba]  # Normalizar
-        
-        # Mostrar resultados
-        st.markdown('<div class="subsection-header">📊 Resultado de la Predicción</div>', unsafe_allow_html=True)
-        
-        result_col1, result_col2, result_col3 = st.columns([1, 2, 1])
-        
-        with result_col2:
-            if prediction == 1:
-                st.success(f"✅ **Predicción: POSITIVO**")
-                st.metric("Confianza", f"{prediction_proba[1]*100:.1f}%")
-            else:
-                st.error(f"❌ **Predicción: NEGATIVO**")
-                st.metric("Confianza", f"{prediction_proba[0]*100:.1f}%")
-        
-        if mostrar_probabilidades:
-            st.markdown("#### 📈 Distribución de Probabilidades")
-            
-            prob_data = pd.DataFrame({
-                'Clase': ['Negativo', 'Positivo'],
-                'Probabilidad': prediction_proba
-            })
-            
-            fig_prob = px.bar(
-                prob_data, 
-                x='Clase', 
-                y='Probabilidad',
-                title="Probabilidades por Clase",
-                color='Probabilidad',
-                text='Probabilidad'
-            )
-            fig_prob.update_traces(texttemplate='%{text:.3f}', textposition='outside')
-            st.plotly_chart(fig_prob, use_container_width=True)
-        
-        if mostrar_explicacion:
-            st.markdown("#### 🔍 Explicación de la Predicción")
-            
-            # Simulación de feature importance para esta predicción
-            feature_impact = {
-                'Variable': ['Variable 1', 'Variable 2', 'Variable 3', 'Variable 4'],
-                'Impacto': [0.35, -0.12, 0.28, -0.05],
-                'Valor_Ingresado': [var1, var2, var3, var4]
-            }
-            
-            impact_df = pd.DataFrame(feature_impact)
-            
-            fig_impact = px.bar(
-                impact_df,
-                x='Variable',
-                y='Impacto',
-                color='Impacto',
-                title="Impacto de cada Variable en la Predicción",
-                color_continuous_scale='RdYlGn'
-            )
-            st.plotly_chart(fig_impact, use_container_width=True)
-            
-            # Explicación textual
-            st.markdown("""
-            **Interpretación:**
-            - Las variables con impacto positivo (verde) favorecen la predicción positiva
-            - Las variables con impacto negativo (rojo) favorecen la predicción negativa
-            - El tamaño del impacto indica la importancia de cada variable para esta predicción específica
-            """)
-    
-    # Análisis de sensibilidad
-    st.markdown('<div class="subsection-header">📊 Análisis de Sensibilidad</div>', unsafe_allow_html=True)
-    
-    sens_col1, sens_col2 = st.columns(2)
-    
-    with sens_col1:
-        st.markdown("#### 🎛️ Variable a Analizar")
-        variable_sensibilidad = st.selectbox(
-            "Selecciona variable para análisis de sensibilidad:",
-            ["Variable 1", "Variable 3"]  # Solo variables numéricas
-        )
-    
-    with sens_col2:
-        st.markdown("#### ⚙️ Configuración")
-        rango_analisis = st.slider("Rango de variación (%)", 10, 50, 20)
-    
-    if st.button("🔬 Realizar Análisis de Sensibilidad"):
-        # Simulación de análisis de sensibilidad
-        if variable_sensibilidad == "Variable 1":
-            base_value = var1
-            variation_range = np.linspace(
-                base_value * (1 - rango_analisis/100),
-                base_value * (1 + rango_analisis/100),
-                20
-            )
-        else:
-            base_value = var3
-            variation_range = np.linspace(
-                base_value * (1 - rango_analisis/100),
-                base_value * (1 + rango_analisis/100),
-                20
-            )
-        
-        # Simulación de predicciones para cada valor
-        predictions_sens = [random.random() for _ in variation_range]
-        
-        sens_data = pd.DataFrame({
-            'Valor': variation_range,
-            'Probabilidad_Positiva': predictions_sens
-        })
-        
-        fig_sens = px.line(
-            sens_data,
-            x='Valor',
-            y='Probabilidad_Positiva',
-            title=f"Sensibilidad de la Predicción a {variable_sensibilidad}",
-            markers=True
-        )
-        fig_sens.add_vline(x=base_value, line_dash="dash", line_color="red", 
-                          annotation_text="Valor Actual")
-        st.plotly_chart(fig_sens, use_container_width=True)
-    
-    # Comparación de modelos en vivo
-    st.markdown('<div class="subsection-header">⚖️ Comparación de Modelos</div>', unsafe_allow_html=True)
-    
-    if st.button("🔄 Comparar Todos los Modelos"):
-        
-        # Simulación de predicciones de múltiples modelos
-        modelos_comparacion = ['Random Forest', 'Logistic Regression', 'SVM', 'XGBoost']
-        predicciones_comp = [random.random() for _ in modelos_comparacion]
-        
-        comp_data = pd.DataFrame({
-            'Modelo': modelos_comparacion,
-            'Probabilidad_Positiva': predicciones_comp,
-            'Confianza': [p if p > 0.5 else 1-p for p in predicciones_comp]
-        })
-        
-        fig_comp = px.bar(
-            comp_data,
-            x='Modelo',
-            y='Probabilidad_Positiva',
-            color='Confianza',
-            title="Comparación de Predicciones entre Modelos",
-            text='Probabilidad_Positiva'
-        )
-        fig_comp.update_traces(texttemplate='%{text:.3f}', textposition='outside')
-        fig_comp.add_hline(y=0.5, line_dash="dash", line_color="black", 
-                          annotation_text="Umbral de Decisión")
-        st.plotly_chart(fig_comp, use_container_width=True)
-    
-    # Simulador de impacto económico
-    st.markdown('<div class="subsection-header">💰 Simulador de Impacto Económico</div>', unsafe_allow_html=True)
-    
-    eco_col1, eco_col2 = st.columns(2)
-    
-    with eco_col1:
-        st.markdown("#### 💵 Parámetros Económicos")
-        valor_tp = st.number_input("Valor Verdadero Positivo ($)", value=1000)
-        costo_fp = st.number_input("Costo Falso Positivo ($)", value=200)
-        costo_fn = st.number_input("Costo Falso Negativo ($)", value=800)
-        volumen_mensual = st.number_input("Volumen Mensual de Casos", value=1000)
-    
-    with eco_col2:
-        if st.button("💹 Calcular Impacto Económico"):
-            
-            # Simulación de matriz de confusión
-            tp = int(volumen_mensual * 0.3 * 0.85)  # 30% positivos, 85% detected
-            fn = int(volumen_mensual * 0.3 * 0.15)  # 15% missed
-            fp = int(volumen_mensual * 0.7 * 0.10)  # 10% false alarms
-            tn = int(volumen_mensual * 0.7 * 0.90)  # 90% correct negatives
-            
-            ganancia_mensual = (tp * valor_tp) - (fp * costo_fp) - (fn * costo_fn)
-            ganancia_anual = ganancia_mensual * 12
-            
-            st.success(f"💰 **Ganancia Mensual: ${ganancia_mensual:,.2f}**")
-            st.info(f"📊 **Ganancia Anual: ${ganancia_anual:,.2f}**")
-            
-            # Desglose
-            st.markdown("#### 📊 Desglose:")
-            st.write(f"- Verdaderos Positivos: {tp} × ${valor_tp} = ${tp * valor_tp:,}")
-            st.write(f"- Falsos Positivos: {fp} × ${costo_fp} = -${fp * costo_fp:,}")
-            st.write(f"- Falsos Negativos: {fn} × ${costo_fn} = -${fn * costo_fn:,}")
-    
-    # Información de contacto y próximos pasos
-    st.markdown('<div class="subsection-header">📞 Información Adicional</div>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="conclusion-box">
-    <h4>📈 Próximos Pasos para Implementación:</h4>
-    <ol>
-    <li><strong>Validación Adicional:</strong> Probar con datos más recientes</li>
-    <li><strong>Integración:</strong> Conectar con sistemas existentes</li>
-    <li><strong>Monitoreo:</strong> Establecer métricas de seguimiento</li>
-    <li><strong>Escalamiento:</strong> Preparar para mayor volumen de datos</li>
-    </ol>
-    
-    <h4>👥 Contacto del Proyecto:</h4>
-    <p><strong>Alumno:</strong> [Tu Nombre] - [tu.email@email.com]</p>
-    <p><strong>Tutor:</strong> [Nombre Tutor] - [tutor.email@email.com]</p>
-    <p><strong>Institución:</strong> [Nombre de la Institución]</p>
-    </div>
-    """, unsafe_allow_html=True)
+    #st.markdown('<div class="section-header">⚡ Aplicación Interactiva</div>', unsafe_allow_html=True)
+    it.show_interactive_recommender()
+
+
+
+
+
+#=====================================#
+# CONCLUSIONES
+#=====================================#
+
+
+
+
 
 def show_conclusions():
     st.markdown('<div class="section-header">📋 Conclusiones</div>', unsafe_allow_html=True)
