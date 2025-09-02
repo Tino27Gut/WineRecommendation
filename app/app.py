@@ -2782,8 +2782,56 @@ def show_model_selection():
 
 
 def show_interactive_app():
-    #st.markdown('<div class="section-header">⚡ Aplicación Interactiva</div>', unsafe_allow_html=True)
-    it.show_interactive_recommender()
+
+    # Training Model for Recommender
+
+    # - Aux Info -
+    dataset_dicts = get_complete_datasets(ut)
+    model_df_nocat = dataset_dicts["model_df_nocat"]
+    simulation_params = pd.read_pickle(ut.get_project_file_path("src", "data", "synthetic", "simulation_13_params.pkl"))
+    avg_tkt = model_df_nocat["price"].mean()
+    churn_like = simulation_params["liked_churn_rate"]
+    churn_dislike = simulation_params["disliked_churn_rate"]
+
+    # - Features -
+    rf_fisel_features = [
+        'rating_qty', 'has_user_main_pairing', 'rating', 'user_body_diff',
+        'user_acidity_diff', 'user_sweetness_diff', 'user_tannins_diff', 'user_price_diff',
+        'user_price_center','price'
+    ]
+    
+    # - Data Split -
+    rf_X = model_df_nocat[rf_fisel_features]
+    rf_y = model_df_nocat["liked"]
+
+    # - Pipeline -
+    rf_pipeline = Pipeline([
+        ("rf", RandomForestClassifier(
+            n_estimators=100,
+            max_depth=10,
+            min_samples_split=9,
+            min_samples_leaf=7,
+            max_features='log2',
+            bootstrap=True,
+            criterion='entropy'
+        ))
+    ])
+
+    # - Train Pipeline -
+    rf_results = evaluate_model(
+        pipeline=rf_pipeline,
+        X=rf_X,
+        y=rf_y,
+        features=rf_fisel_features,
+        avg_tkt=avg_tkt,
+        churn_like=churn_like,
+        churn_dislike=churn_dislike
+    )
+
+    trained_rf_pipeline = rf_results["pipeline"]
+
+    # - Run Interactive Recommender -
+    it.show_interactive_recommender(trained_rf_pipeline)
 
 
 

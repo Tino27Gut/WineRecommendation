@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 import random
 from src.utils import utils as ut
+from models.synthetic_user import SyntheticUserSimulator
 
 # CONTINUAR PONIÉNDOLE LAS MÉTRICAS AL MODELO DE RECOMENDACIÓN EN LA APP INTERACTIVA
 
@@ -26,6 +27,20 @@ region_list = list(region["region"])
 
 pairings = pd.read_csv(ut.get_project_file_path("src", "data", "processed", "aux", "pairings.csv"))
 pairings_list = list(pairings["pairings"])
+
+taste_columns = ["body", "tannins", "sweetness", "acidity"]
+
+# Datos de comidas
+meals_df = pd.read_excel(ut.get_project_file_path("src", "data", "raw", "meals", "Meals.xlsx"))
+
+# Instanciar Clase de Usuario Sintético
+user = SyntheticUserSimulator(
+    wine_df=wine_df,
+    meals_df=meals_df,
+    pairing_cols=pairings_list,
+    taste_cols=taste_columns,
+    grape_cols=grapes_list
+)
 
 # Configurar el estado de la sesión
 def init_session_state():
@@ -183,10 +198,10 @@ def show_home_page():
             st.info("🚧 Esta funcionalidad estará disponible próximamente.")
             st.markdown("""
             **Próximamente podrás:**
-            - Explorar vinos por región y bodega
-            - Descubrir vinos con popularidad en alza
-            - Conocer los mejores vinos para cada momento del día
-            - Recibir nuevas recomendaciones adaptadas a tu paladar
+            - Explorá vinos por región y bodega
+            - Descubrí vinos con popularidad en alza
+            - Conocé los mejores vinos para cada momento del día
+            - Recibí nuevas recomendaciones adaptadas a tu paladar
             """)
         
     
@@ -197,13 +212,13 @@ def show_home_page():
     stats_col1, stats_col2, stats_col3, stats_col4 = st.columns(4)
     
     with stats_col1:
-        st.metric("🍷 Vinos en Base", "100+", help="Total de vinos disponibles")
+        st.metric("🍷 Vinos en Base", f"{wine_df["wine_id"].count()}", help="Total de vinos disponibles")
     
     with stats_col2:
-        st.metric("🍽️ Comidas Analizadas", "50+", help="Platos con perfiles de maridaje")
+        st.metric("🍽️ Comidas Analizadas", f"{meals_df["Comida"].count()}", help="Platos con perfiles de maridaje")
     
     with stats_col3:
-        st.metric("🎯 Precisión del Modelo", "87%", help="Precisión en recomendaciones")
+        st.metric("🎯 Precisión del Modelo", "~86%", help="Precisión en recomendaciones")
     
     with stats_col4:
         feedback_count = len(st.session_state.feedback_data)
@@ -211,8 +226,7 @@ def show_home_page():
 
 # SELECCIÓN DE COMIDA
 def show_meal_selection():
-    meals_df, _ = load_sample_data()
-    
+       
     st.markdown('<div class="subsection-header">🍽️ Selección de Comida</div>', unsafe_allow_html=True)
     
     # Botón para volver
@@ -247,12 +261,42 @@ def show_meal_selection():
         with food_col1:
             # Mapa de emojis para comidas
             food_emoji_map = {
-                'asado': '🥩', 'pasta con salsa roquefort': '🍝', 'salmón a la plancha': '🐟',
-                'pizza napolitana': '🍕', 'milanesa de carne': '🍖', 'risotto de champiñones': '🍚',
-                'empanadas de carne': '🥟', 'ensalada': '🥗'
+            # Carnes rojas y derivados
+                'paté de hígado': '🥩', 'carne con salsa de champiñones': '🥩🍄', 'empanadas de carne': '🥟',
+                'guiso de arroz con carne': '🍲', 'hamburguesa con queso': '🍔', 'locro': '🍲',
+                'lomo a la mostaza': '🥩', 'milanesa de carne': '🍖', 'pastel de papa': '🥧',
+                'tacos de res': '🌮', 'ciervo estofado': '🦌', 'cordero asado': '🐑',
+                'milanesa de ternera': '🥩', "asado": "🍖",
+                
+                # Quesos y lácteos
+                'roquefort con nueces': '🧀🥜', 'tabla de quesos y embutidos': '🍱', 'fondue de queso': '🧀',
+                
+                # Pescados y mariscos
+                'trucha / salmón a la mantequilla': '🐟', 'salmón a la plancha': '🍣', 'sushi de atún': '🍣',
+                'ceviche mixto': '🍤', 'gambas al ajillo': '🦐', 'ostras frescas': '🦪', 'paella de mariscos': '🥘',
+                
+                # Pasta y risotto
+                'pasta con salsa roquefort': '🍝', 'risotto de champiñones': '🍚', 'lasagna de jamón y queso': '🍝',
+                'lasagna de verduras': '🍝', 'pasta con salsa mixta': '🍝', 'pasta con salsa de tomate': '🍝',
+                
+                # Cerdo
+                'burrito de cerdo': '🌯', 'chucrut con salchichas': '🌭', 'costillas de cerdo bbq': '🍖',
+                'matambre a la pizza': '🍕', 'tacos de cerdo': '🌮',
+                
+                # Pollo
+                'empanadas de pollo': '🥟', 'milanesa de pollo': '🍗', 'pechuga de pollo rellena': '🍗',
+                'pollo al curry': '🍛', 'pollo al horno con papas': '🍗',
+                
+                # Jamón y embutidos
+                'snacks con dips': '🧀', 'sandwich de jamón y queso': '🥪', 'empanadas de jamón y queso': '🥟',
+                
+                # Vegetarianos
+                'empanadas de verdura': '🥟', 'ensalada': '🥗', 'guiso de lentejas': '🍲',
+                'pizza napolitana': '🍕', 'sopa de cebolla': '🍲', 'sopa de calabaza': '🍲',
+                'tarta de vegetales y queso': '🥧', 'tortilla de papa': '🥚'
             }
             
-            food_emoji = food_emoji_map.get(selected_meal, '🍽️')
+            food_emoji = food_emoji_map.get(selected_meal.lower(), '🍽️')
             
             st.markdown(f"""
             <div style="
@@ -293,23 +337,20 @@ def show_meal_selection():
                 st.markdown("#### 🧩 Ingredientes Compatibles")
                 
                 # Mostrar pairings como tags
-                tags_html = ""
-                for pairing in active_pairings:
-                    clean_pairing = pairing.replace('_', ' ').title()
-                    tags_html += f"""
-                    <span style="
-                        background-color: #e3f2fd;
-                        color: #1976d2;
-                        padding: 5px 10px;
-                        border-radius: 15px;
-                        font-size: 0.9em;
-                        margin: 3px;
-                        display: inline-block;
-                        border: 1px solid #bbdefb;
-                    ">{clean_pairing}</span>
-                    """
-                
+                tags_html = "".join([
+                    f'<span style="background-color: #e3f2fd; '
+                    f'color: #1976d2; '
+                    f'padding: 5px 10px; '
+                    f'border-radius: 15px; '
+                    f'font-size: 0.9em; '
+                    f'margin: 3px; '
+                    f'display: inline-block; '
+                    f'border: 1px solid #bbdefb;">{pairing.replace("_", " ").title()}</span>'
+                    for pairing in active_pairings
+                ])
+
                 st.markdown(f'<div style="margin: 10px 0;">{tags_html}</div>', unsafe_allow_html=True)
+
         
         # Botón para continuar
         if st.button("🎯 Continuar con esta Comida", type="primary"):
@@ -329,30 +370,23 @@ def show_price_selection():
             st.rerun()
     
     with nav_col2:
-        st.markdown(f"**Comida elegida:** 🍽️ {st.session_state.selected_meal}")
+        st.markdown(
+            f"""
+            - **Comida: 🍽️** {st.session_state.selected_meal}
+            """
+        )
     
     st.markdown("### 💵 Define tu Presupuesto")
     st.markdown("Selecciona el rango de precios para filtrar las recomendaciones de vinos.")
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        precio_min = st.number_input(
-            "💰 Precio Mínimo ($)",
-            min_value=1,
-            max_value=149,
-            value=1,
-            help="Precio mínimo por botella. 1 = sin mínimo"
-        )
-    
-    with col2:
-        precio_max = st.number_input(
-            "💰 Precio Máximo ($)",
-            min_value=2,
-            max_value=150,
-            value=150,
-            help="Precio máximo por botella. 150+ = sin máximo"
-        )
+    # Slider de rango para precio
+    precio_min, precio_max = st.slider(
+        "💰 Rango de Precio ($)",
+        min_value=0,
+        max_value=151,
+        value=(5, 20),
+        help="Selecciona el rango de precio por botella. 0 = sin mínimo, 151 = sin máximo"
+    )
     
     # Validación de precios
     if precio_min >= precio_max:
@@ -362,24 +396,23 @@ def show_price_selection():
     # Visualización del rango
     st.markdown("#### 📊 Rango de Precios Seleccionado")
     
-    range_text = f"${precio_min}"
-    if precio_min == 1:
+    range_text = f"\${precio_min}"
+    if precio_min == 0:
         range_text = "Sin mínimo"
     
     range_text += " - "
     
-    if precio_max >= 150:
+    if precio_max > 150:
         range_text += "Sin máximo"
     else:
-        range_text += f"${precio_max}"
+        range_text += f"\${precio_max}"
     
     st.info(f"🎯 **Rango seleccionado:** {range_text}")
     
     # Estadísticas simuladas del rango
-    _, wine_df = load_sample_data()
     wines_in_range = wine_df[
-        (wine_df['price'] >= (None if precio_min == 1 else precio_min)) &
-        (wine_df['price'] <= (None if precio_max >= 150 else precio_max))
+        (wine_df['price'] >= (0 if precio_min == 0 else precio_min)) &
+        (wine_df['price'] <= (9999 if precio_max > 150 else precio_max))
     ]
     
     st.markdown(f"📈 **Vinos disponibles en este rango:** {len(wines_in_range)} vinos")
@@ -403,10 +436,15 @@ def show_taste_selection():
     
     with nav_col2:
         precio_min, precio_max = st.session_state.price_range
-        range_text = f"${precio_min}" if precio_min != 1 else "Sin mín"
+        range_text = f"\${precio_min}" if precio_min != 1 else "Sin mín"
         range_text += " - "
-        range_text += f"${precio_max}" if precio_max < 150 else "Sin máx"
-        st.markdown(f"**Comida:** {st.session_state.selected_meal} | **Precio:** {range_text}")
+        range_text += f"\${precio_max}" if precio_max < 150 else "Sin máx"
+        st.markdown(
+            f"""
+            - **Comida: 🍽️** {st.session_state.selected_meal}
+            - **Precio: 💰** {range_text}
+            """
+        )
     
     st.markdown("### 🎭 Define tus Preferencias de Sabor")
     st.markdown("Selecciona la intensidad deseada para cada característica del vino.")
@@ -486,6 +524,7 @@ def show_taste_selection():
             st.markdown("---")
     
     # Resumen de selecciones
+    st.markdown("---")
     st.markdown("#### 📋 Resumen de Preferencias")
     
     summary_cols = st.columns(4)
@@ -515,10 +554,34 @@ def show_taste_selection():
 def show_grape_selection():
     st.markdown('<div class="subsection-header">🍇 Selección de Uvas</div>', unsafe_allow_html=True)
     
+
     # Navegación
-    if st.button("← Cambiar Preferencias de Sabor"):
-        st.session_state.page = 'taste_selection'
-        st.rerun()
+    nav_col1, nav_col2 = st.columns([1, 4])
+    with nav_col1:
+        if st.button("← Cambiar Preferencias de Sabor"):
+            st.session_state.page = 'taste_selection'
+            st.rerun()
+
+    with nav_col2:
+        # Precio
+        precio_min, precio_max = st.session_state.price_range
+        range_text = f"\${precio_min}" if precio_min != 1 else "Sin mín"
+        range_text += " - "
+        range_text += f"\${precio_max}" if precio_max < 150 else "Sin máx"
+
+        # Preferencias de sabor
+        taste_prefs = st.session_state.taste_preferences
+        taste_text = " | ".join(
+            [f"{k.capitalize()}: {v}" for k, v in taste_prefs.items()]
+        )
+
+        st.markdown(
+            f"""
+            - **Comida: 🍽️** {st.session_state.selected_meal}
+            - **Precio: 💰** {range_text}
+            - **Sabores: 😋** {taste_text}
+            """
+        )
     
     st.markdown("### 🍇 Elige las Variedades de Uva")
     st.markdown("Selecciona una o más variedades de uva que te gustaría probar.")
@@ -536,6 +599,18 @@ def show_grape_selection():
             'emoji': '🍷',
             'description': 'Rey de los tintos, estructura y elegancia',
             'characteristics': 'Cuerpo alto, taninos firmes, notas de cassis'
+        },
+        'cabernet_franc': {
+            'name': 'Cabernet Franc',
+            'emoji': '🍇',
+            'description': 'Aromática y elegante, más ligera que el Cabernet Sauvignon',
+            'characteristics': 'Cuerpo medio, taninos finos, notas de pimiento y frambuesa'
+        },
+        'petit_verdot': {
+            'name': 'Petit Verdot',
+            'emoji': '🍷',
+            'description': 'Potente y concentrada, aporta color y estructura a blends',
+            'characteristics': 'Cuerpo alto, taninos intensos, notas florales y especiadas'
         },
         'merlot': {
             'name': 'Merlot',
@@ -561,18 +636,6 @@ def show_grape_selection():
             'description': 'Blanco versátil, desde fresco a cremoso',
             'characteristics': 'Cuerpo variable, acidez balanceada, notas de manzana'
         },
-        'sauvignon_blanc': {
-            'name': 'Sauvignon Blanc',
-            'emoji': '🍾',
-            'description': 'Fresco y aromático, ideal para el verano',
-            'characteristics': 'Cuerpo ligero, acidez alta, notas herbales'
-        },
-        'torrontes': {
-            'name': 'Torrontés',
-            'emoji': '🌸',
-            'description': 'Blanco argentino único, muy aromático',
-            'characteristics': 'Cuerpo ligero, acidez media, notas florales'
-        },
         'otras_uvas': {
             'name': 'Otras Variedades',
             'emoji': '🎭',
@@ -580,7 +643,7 @@ def show_grape_selection():
             'characteristics': 'Diversidad de estilos y características únicas'
         }
     }
-    
+
     st.markdown("#### 🎯 Selección Múltiple")
     st.markdown("*Puedes elegir una o varias variedades. Si no seleccionas ninguna, se considerarán todas.*")
     
@@ -630,7 +693,7 @@ def show_grape_selection():
         st.rerun()
 
 # RESULTADOS DE VINOS
-def show_wine_results():
+def show_wine_results(trained_model):
     st.markdown('<div class="subsection-header">🍷 Recomendaciones Personalizadas</div>', unsafe_allow_html=True)
     
     # Navegación
@@ -643,7 +706,6 @@ def show_wine_results():
     # Procesar filtros solo una vez
     if st.session_state.filtered_wines is None or st.session_state.wine_predictions is None:
         with st.spinner("🔍 Buscando los vinos perfectos para ti..."):
-            meals_df, wine_df = load_sample_data()
             
             # Obtener pairings de la comida seleccionada
             meal_row = meals_df[meals_df.iloc[:, 0] == st.session_state.selected_meal].iloc[0]
@@ -652,6 +714,7 @@ def show_wine_results():
             
             # Aplicar filtros
             wine_base = wine_df.copy()
+            wine_base.columns = wine_base.columns.str.lower() # Estandariza columnas (lower case)
             
             # Filtro por pairings
             if user_pairings:
@@ -661,7 +724,7 @@ def show_wine_results():
             
             # Filtro por precio
             precio_min, precio_max = st.session_state.price_range
-            if precio_min != 1:
+            if precio_min != 0:
                 precio_min_filtered = wine_base[wine_base["price"] >= precio_min]
                 if len(precio_min_filtered) > 0:
                     wine_base = precio_min_filtered
@@ -673,12 +736,26 @@ def show_wine_results():
             
             # Filtro por uvas
             if st.session_state.selected_grapes:
-                grape_filtered = wine_base[wine_base[st.session_state.selected_grapes].sum(axis=1) > 0]
+                selected_grapes = [g.lower() for g in st.session_state.selected_grapes]
+                grape_filtered = wine_base[wine_base[selected_grapes].sum(axis=1) > 0]
                 if len(grape_filtered) > 0:
                     wine_base = grape_filtered
             
-            # Generar predicciones
-            predictions = simulate_wine_predictions(wine_base, st.session_state.taste_preferences)
+            # TODO: AGREGAR TRANSFORMACIONES DE DATOS PARA OBTENER LAS COLUMNAS QUE ME FALTAN
+            # ['has_user_main_pairing', 'user_body_diff', 'user_acidity_diff', 'user_sweetness_diff', 'user_tannins_diff', 'user_price_diff', 'user_price_center']
+
+            # Generar predicciones reales usando el pipeline entrenado
+            try:
+                # Preparar las features para el modelo (usar solo las features que el modelo espera)
+                model_features = wine_base[trained_model.feature_names_in_]
+                
+                # Generar predicciones usando el pipeline (ya incluye scaling y random forest)
+                predictions = trained_model.predict_proba(model_features)[:, 1]  # Probabilidad de clase positiva
+                
+            except Exception as e:
+                st.error(f"Error al generar predicciones: {str(e)}")
+                # Fallback a predicciones simuladas si hay error
+                predictions = simulate_wine_predictions(wine_base, st.session_state.taste_preferences)
             
             # Combinar vinos con predicciones y ordenar
             wine_base_with_predictions = wine_base.copy()
@@ -1113,7 +1190,7 @@ def show_feedback_thanks():
         """, unsafe_allow_html=True)
 
 # APLICACIÓN PRINCIPAL
-def show_interactive_recommender():
+def show_interactive_recommender(trained_model):
     init_session_state()
     
     st.header("🍷 Recomendador Interactivo de Vinos")
@@ -1192,7 +1269,7 @@ def show_interactive_recommender():
     elif page == 'grape_selection':
         show_grape_selection()
     elif page == 'wine_results':
-        show_wine_results()
+        show_wine_results(trained_model)
     elif page == 'wine_feedback':
         show_wine_feedback()
     elif page == 'feedback_thanks':
