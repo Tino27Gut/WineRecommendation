@@ -404,6 +404,7 @@ def show_price_selection():
     
     if precio_max > 150:
         range_text += "Sin máximo"
+        precio_max = None
     else:
         range_text += f"\${precio_max}"
     
@@ -412,7 +413,7 @@ def show_price_selection():
     # Estadísticas simuladas del rango
     wines_in_range = wine_df[
         (wine_df['price'] >= (0 if precio_min == 0 else precio_min)) &
-        (wine_df['price'] <= (9999 if precio_max > 150 else precio_max))
+        (wine_df['price'] <= (9999 if precio_max == None else precio_max))
     ]
     
     st.markdown(f"📈 **Vinos disponibles en este rango:** {len(wines_in_range)} vinos")
@@ -729,7 +730,7 @@ def show_wine_results(trained_model):
                 if len(precio_min_filtered) > 0:
                     wine_base = precio_min_filtered
             
-            if precio_max < 150:
+            if precio_max != None:
                 precio_max_filtered = wine_base[wine_base["price"] <= precio_max]
                 if len(precio_max_filtered) > 0:
                     wine_base = precio_max_filtered
@@ -742,6 +743,59 @@ def show_wine_results(trained_model):
                     wine_base = grape_filtered
             
             # TODO: AGREGAR TRANSFORMACIONES DE DATOS PARA OBTENER LAS COLUMNAS QUE ME FALTAN
+
+            def calc_user_taste_diff(x, min, max):
+                if min <= x <= max:
+                    return 0
+                elif x > max:
+                    return x - max
+                else:
+                    return x - min
+
+            def calc_user_price_diff(x, min, max):
+                center = 0
+                if max > 150:
+                    center = min
+                else:
+                    center = (min + max) / 2
+                
+                return x - center
+            
+
+            # Traducir labels de sabor del usuario a valores
+            meal_info = meals_df[meals_df.iloc[:, 0] == st.session_state.selected_meal].iloc[0]
+            main_pairing = meal_info.iloc[1] if len(meal_info) > 1 else "No especificado"
+            taste_profiles, _ = user._build_pairing_profile()
+            food_quantiles = taste_profiles[main_pairing] # Diccionario de sabores con serie de su cuantil, valor.
+
+            intensity_options = ["leve", "moderado", "marcado", "intenso"]
+            tastes = ["body", "tanins", "sweetness", "acidity"]
+
+            for t in tastes:
+                taste_quantile_values = food_quantiles[t].values
+                taste_pref = st.session_state.taste_preferences[t]
+                intensity_value = intensity_options.index(taste_pref)
+                selected_taste_range = [taste_quantile_values[intensity_value], taste_quantile_values[intensity_value+1]]
+                wine_base["user_" + t + "_diff"] = wine_base.apply(
+                    lambda row: calc_user_taste_diff(
+                        x=row[t],
+                        min=selected_taste_range[0],
+                        max=selected_taste_range[1]
+                    ),
+                    axis=1
+                )
+
+            wine_base["has_user_main_pairing"] = wine_base.apply(lambda row: 1 if row[st.session_state.selected_meal]==1 else 0, axis=1)
+    
+    #         wine_base["user_body_diff"] = recommend_df.apply(
+    #             lambda row: taste_dist_to_optimal(
+    #                 x=row[taste],
+    #                 min=row["user_" + taste + "_min"],
+    #                 max=row["user_" + taste + "_max"]
+    #             ),
+    #             axis=1
+    # )
+
             # ['has_user_main_pairing', 'user_body_diff', 'user_acidity_diff', 'user_sweetness_diff', 'user_tannins_diff', 'user_price_diff', 'user_price_center']
 
             # Generar predicciones reales usando el pipeline entrenado

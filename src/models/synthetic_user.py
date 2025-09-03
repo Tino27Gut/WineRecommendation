@@ -189,7 +189,7 @@ class SyntheticUserSimulator:
                 ]
                 selected_val = np.random.choice(quant_random_options)
             else:
-                # Elección según distribución normal del sabora para el pairing seleccionado
+                # Elección según distribución normal del sabor para el pairing seleccionado
                 median = quantiles[.5]
                 min_val = quantiles[0]
                 max_val = quantiles[1]
