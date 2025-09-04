@@ -8,7 +8,7 @@ import random
 from src.utils import utils as ut
 from models.synthetic_user import SyntheticUserSimulator
 
-# CONTINUAR PONIÉNDOLE LAS MÉTRICAS AL MODELO DE RECOMENDACIÓN EN LA APP INTERACTIVA
+# TODO: INCLUIR IMÁGENES DE VINOS, MEJORAR PREFORMANCE, CORREGIR OPCIONES DE "AJUSTAR FILTROS", MEJORAR CONTADOR DE INTENSIDAD EN VINOS, PONER ÍCONOS DE SABOR EN PÁGINA DE AGRADECIMIENTO.
 
 wine_df = pd.read_csv(ut.get_project_file_path("src", "data", "transformed", "wines_clean.csv"))
 wine_df = wine_df.reset_index(drop=False)
@@ -383,9 +383,9 @@ def show_price_selection():
     precio_min, precio_max = st.slider(
         "💰 Rango de Precio ($)",
         min_value=0,
-        max_value=151,
+        max_value=51,
         value=(5, 20),
-        help="Selecciona el rango de precio por botella. 0 = sin mínimo, 151 = sin máximo"
+        help="Selecciona el rango de precio por botella. 0 = sin mínimo, 51 = sin máximo"
     )
     
     # Validación de precios
@@ -396,23 +396,23 @@ def show_price_selection():
     # Visualización del rango
     st.markdown("#### 📊 Rango de Precios Seleccionado")
     
-    range_text = f"\${precio_min}"
+    range_text = f"\\${precio_min}"
     if precio_min == 0:
         range_text = "Sin mínimo"
     
     range_text += " - "
     
-    if precio_max > 150:
+    if precio_max > 50:
         range_text += "Sin máximo"
         precio_max = None
     else:
-        range_text += f"\${precio_max}"
+        range_text += f"\\${precio_max}"
     
     st.info(f"🎯 **Rango seleccionado:** {range_text}")
     
     # Estadísticas simuladas del rango
     wines_in_range = wine_df[
-        (wine_df['price'] >= (0 if precio_min == 0 else precio_min)) &
+        (wine_df['price'] >= precio_min) &
         (wine_df['price'] <= (9999 if precio_max == None else precio_max))
     ]
     
@@ -437,9 +437,9 @@ def show_taste_selection():
     
     with nav_col2:
         precio_min, precio_max = st.session_state.price_range
-        range_text = f"\${precio_min}" if precio_min != 1 else "Sin mín"
+        range_text = f"\\${precio_min}" if precio_min != 0 else "Sin mín"
         range_text += " - "
-        range_text += f"\${precio_max}" if precio_max < 150 else "Sin máx"
+        range_text += f"\\${precio_max}" if precio_max != None else "Sin máx"
         st.markdown(
             f"""
             - **Comida: 🍽️** {st.session_state.selected_meal}
@@ -449,7 +449,8 @@ def show_taste_selection():
     
     st.markdown("### 🎭 Define tus Preferencias de Sabor")
     st.markdown("Selecciona la intensidad deseada para cada característica del vino.")
-    
+    st.markdown("---")
+
     intensity_options = ["leve", "moderado", "marcado", "intenso"]
     
     # Definir las características con sus descripciones
@@ -566,9 +567,9 @@ def show_grape_selection():
     with nav_col2:
         # Precio
         precio_min, precio_max = st.session_state.price_range
-        range_text = f"\${precio_min}" if precio_min != 1 else "Sin mín"
+        range_text = f"\\${precio_min}" if precio_min != 0 else "Sin mín"
         range_text += " - "
-        range_text += f"\${precio_max}" if precio_max < 150 else "Sin máx"
+        range_text += f"\\${precio_max}" if precio_max != None else "Sin máx"
 
         # Preferencias de sabor
         taste_prefs = st.session_state.taste_preferences
@@ -730,7 +731,7 @@ def show_wine_results(trained_model):
                 if len(precio_min_filtered) > 0:
                     wine_base = precio_min_filtered
             
-            if precio_max != None:
+            if precio_max:
                 precio_max_filtered = wine_base[wine_base["price"] <= precio_max]
                 if len(precio_max_filtered) > 0:
                     wine_base = precio_max_filtered
@@ -742,34 +743,37 @@ def show_wine_results(trained_model):
                 if len(grape_filtered) > 0:
                     wine_base = grape_filtered
             
-            # TODO: AGREGAR TRANSFORMACIONES DE DATOS PARA OBTENER LAS COLUMNAS QUE ME FALTAN
+            # Agregar columnas que faltan que el modelo utiliza como input:
+            # Pairing: 'has_user_main_pairing'.
+            # Taste: 'user_body_diff', 'user_acidity_diff', 'user_sweetness_diff', 'user_tannins_diff'.
+            # Price: 'user_price_diff', 'user_price_center'.
 
-            def calc_user_taste_diff(x, min, max):
-                if min <= x <= max:
+            def calc_user_taste_diff(x, min_taste, max_taste):
+                if min_taste <= x <= max_taste:
                     return 0
-                elif x > max:
-                    return x - max
+                elif x > max_taste:
+                    return x - max_taste
                 else:
-                    return x - min
+                    return x - min_taste
 
-            def calc_user_price_diff(x, min, max):
+            def calc_user_price_diff(x, min_price, max_price):
                 center = 0
-                if max > 150:
-                    center = min
+                if max_price > 50:
+                    center = min_price
                 else:
-                    center = (min + max) / 2
+                    center = (min_price + max_price) / 2
                 
                 return x - center
             
 
             # Traducir labels de sabor del usuario a valores
             meal_info = meals_df[meals_df.iloc[:, 0] == st.session_state.selected_meal].iloc[0]
-            main_pairing = meal_info.iloc[1] if len(meal_info) > 1 else "No especificado"
+            main_pairing = meal_info.iloc[1].lower() if len(meal_info) > 1 else "No especificado"
             taste_profiles, _ = user._build_pairing_profile()
             food_quantiles = taste_profiles[main_pairing] # Diccionario de sabores con serie de su cuantil, valor.
 
             intensity_options = ["leve", "moderado", "marcado", "intenso"]
-            tastes = ["body", "tanins", "sweetness", "acidity"]
+            tastes = ["body", "tannins", "sweetness", "acidity"]
 
             for t in tastes:
                 taste_quantile_values = food_quantiles[t].values
@@ -779,37 +783,40 @@ def show_wine_results(trained_model):
                 wine_base["user_" + t + "_diff"] = wine_base.apply(
                     lambda row: calc_user_taste_diff(
                         x=row[t],
-                        min=selected_taste_range[0],
-                        max=selected_taste_range[1]
+                        min_taste=selected_taste_range[0],
+                        max_taste=selected_taste_range[1]
                     ),
                     axis=1
                 )
 
-            wine_base["has_user_main_pairing"] = wine_base.apply(lambda row: 1 if row[st.session_state.selected_meal]==1 else 0, axis=1)
-    
-    #         wine_base["user_body_diff"] = recommend_df.apply(
-    #             lambda row: taste_dist_to_optimal(
-    #                 x=row[taste],
-    #                 min=row["user_" + taste + "_min"],
-    #                 max=row["user_" + taste + "_max"]
-    #             ),
-    #             axis=1
-    # )
+            wine_base["has_user_main_pairing"] = wine_base.apply(lambda row: 1 if row[main_pairing]==1 else 0, axis=1)
 
-            # ['has_user_main_pairing', 'user_body_diff', 'user_acidity_diff', 'user_sweetness_diff', 'user_tannins_diff', 'user_price_diff', 'user_price_center']
+            price_min, price_max = st.session_state.price_range
+
+            wine_base["user_price_min"] = price_min
+            wine_base["user_price_max"] = price_max if price_max != None else 2000 # replaces nulls for a high value (same as in model analysis)
+            wine_base["user_price_center"] = (wine_base["user_price_max"] + wine_base["user_price_min"]) / 2
+            wine_base["user_price_diff"] = wine_base.apply(
+                lambda row: calc_user_price_diff(
+                    x=row["price"],
+                    min_price=row["user_price_min"],
+                    max_price=row["user_price_max"]
+                ),
+                axis=1
+            )
 
             # Generar predicciones reales usando el pipeline entrenado
             try:
                 # Preparar las features para el modelo (usar solo las features que el modelo espera)
                 model_features = wine_base[trained_model.feature_names_in_]
                 
-                # Generar predicciones usando el pipeline (ya incluye scaling y random forest)
+                # Generar predicciones usando el pipeline
                 predictions = trained_model.predict_proba(model_features)[:, 1]  # Probabilidad de clase positiva
                 
             except Exception as e:
                 st.error(f"Error al generar predicciones: {str(e)}")
                 # Fallback a predicciones simuladas si hay error
-                predictions = simulate_wine_predictions(wine_base, st.session_state.taste_preferences)
+                # predictions = simulate_wine_predictions(wine_base, st.session_state.taste_preferences)
             
             # Combinar vinos con predicciones y ordenar
             wine_base_with_predictions = wine_base.copy()
@@ -825,8 +832,8 @@ def show_wine_results(trained_model):
     with nav_col2:
         st.markdown("**🎯 Filtros aplicados:**")
         precio_min, precio_max = st.session_state.price_range
-        price_text = f"${precio_min}" if precio_min != 1 else "Sin mín"
-        price_text += f"-${precio_max}" if precio_max < 150 else "-Sin máx"
+        price_text = f"\\${precio_min}" if precio_min != 0 else "Sin mín"
+        price_text += f"-\\${precio_max}" if precio_max != None else "-Sin máx"
         
         grape_text = f"{len(st.session_state.selected_grapes)} uvas" if st.session_state.selected_grapes else "Todas"
         st.markdown(f"🍽️ {st.session_state.selected_meal} | 💰 {price_text} | 🍇 {grape_text} | 🍷 {len(filtered_wines)} vinos")
@@ -914,9 +921,9 @@ def show_wine_results(trained_model):
         
         with wine_col2:
             # Información del vino
-            st.markdown(f"#### 🍷 {wine['wine_name']}")
+            st.markdown(f"#### 🍷 {wine['name']}")
             st.markdown(f"**🏭 Bodega:** {wine['winery']}")
-            st.markdown(f"**📍 Región:** {wine['region']}")
+            #st.markdown(f"**📍 Región:** {wine['region']}") -> No puedo traerlo así porque está en formato one-hot.
             st.markdown(f"**💰 Precio:** ${wine['price']:.0f}")
             
             # Características de sabor
@@ -943,10 +950,17 @@ def show_wine_results(trained_model):
                     """, unsafe_allow_html=True)
             
             # Variedades de uva
-            grape_columns = ['malbec', 'cabernet_sauvignon', 'merlot', 'pinot_noir', 'syrah', 
-                        'chardonnay', 'sauvignon_blanc', 'torrontes', 'otras_uvas']
-            wine_grapes = [col.replace('_', ' ').title() for col in grape_columns if wine[col] == 1]
-            
+            grape_columns = ['malbec', 'cabernet sauvignon', 'cabernet franc', 'petit verdot',
+                             'merlot', 'pinot noir', 'shiraz/syrah', 'chardonnay']
+
+    
+            wine_grapes = [col.title() for col in grape_columns if wine[col] == 1]
+
+            other_grapes = [col for col in wine.index if col not in grape_columns and wine[col] == 1]
+
+            if other_grapes:
+                wine_grapes.append("Otras Variedades")
+
             if wine_grapes:
                 grape_text = " • ".join(wine_grapes)
                 st.markdown(f"**🍇 Variedades:** {grape_text}")
@@ -1082,9 +1096,9 @@ def show_wine_feedback():
         """, unsafe_allow_html=True)
     
     with wine_col2:
-        st.markdown(f"#### 🍷 {wine['wine_name']}")
+        st.markdown(f"#### 🍷 {wine['name']}")
         st.markdown(f"**🏭 Bodega:** {wine['winery']}")
-        st.markdown(f"**📍 Región:** {wine['region']}")
+        #st.markdown(f"**📍 Región:** {wine['region']}")
         st.markdown(f"**💰 Precio:** ${wine['price']:.0f}")
         st.markdown(f"**🎯 Match Predicho:** {wine['prediction_score']:.1%}")
         
@@ -1141,7 +1155,7 @@ def show_feedback_thanks():
     st.markdown('<div class="subsection-header">🙏 ¡Gracias por tu Feedback!</div>', unsafe_allow_html=True)
     
     liked = st.session_state.get('user_liked_wine', True)
-    wine_name = st.session_state.selected_wine['wine_name']
+    wine_name = st.session_state.selected_wine['name']
     
     if liked:
         st.success(f"🎉 ¡Excelente! Nos alegra que hayas disfrutado el {wine_name}")
