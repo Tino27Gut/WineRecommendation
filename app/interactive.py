@@ -8,7 +8,7 @@ import random
 from src.utils import utils as ut
 from models.synthetic_user import SyntheticUserSimulator
 
-# TODO: MEJORAR PREFORMANCE, CORREGIR OPCIONES DE "AJUSTAR FILTROS", MEJORAR CONTADOR DE INTENSIDAD EN VINOS, PONER ÍCONOS DE SABOR EN PÁGINA DE AGRADECIMIENTO.
+# TODO: MEJORAR PREFORMANCE, CORREGIR OPCIONES DE "AJUSTAR FILTROS", PONER ÍCONOS DE SABOR EN PÁGINA DE SELECCIÓN VINO / AGRADECIMIENTO.
 
 wine_df = pd.read_csv(ut.get_project_file_path("src", "data", "transformed", "wines_clean.csv"))
 wine_df = wine_df.reset_index(drop=False)
@@ -626,8 +626,8 @@ def show_grape_selection():
             'description': 'Elegante y compleja, la diva de los tintos',
             'characteristics': 'Cuerpo ligero-medio, taninos delicados, notas terrosas'
         },
-        'Syrah/Shiraz': {
-            'name': 'Syrah/Shiraz',
+        'Shiraz/Syrah': {
+            'name': 'Shiraz/Syrah',
             'emoji': '🍇',
             'description': 'Especiada y potente, gran personalidad',
             'characteristics': 'Cuerpo alto, taninos medios, notas especiadas'
@@ -717,7 +717,6 @@ def show_wine_results(trained_model):
             # Aplicar filtros
             wine_base = wine_df.copy()
             wine_base.columns = wine_base.columns.str.lower() # Estandariza columnas (lower case)
-            # TODO: no está tomando 'syrah/shiraz' bien. Revisar.
             
             # Filtro por pairings
             if user_pairings:
@@ -900,7 +899,7 @@ def show_wine_results(trained_model):
             try:
                 st.markdown(f"""
                 <div style="display: flex; justify-content: center; margin: 10px 0;">
-                    <img src="{wine["image"]}" width="50" style="border-radius: 5px;">
+                    <img src="{wine["image"]}" width="80" style="border-radius: 5px;">
                 </div>
                 """, unsafe_allow_html=True)
             except:
@@ -940,10 +939,12 @@ def show_wine_results(trained_model):
         
         with wine_col2:
             # Información del vino
-            st.markdown(f"#### 🍷 {wine['name']}")
+            st.markdown(f"#### 🍷 {wine['name']} - {int(wine["year"])}")
             st.markdown(f"**🏭 Bodega:** {wine['winery']}")
             #st.markdown(f"**📍 Región:** {wine['region']}") -> No puedo traerlo así porque está en formato one-hot.
+            st.markdown(f"**⭐ Rating:** {wine['rating']:.1f}")
             st.markdown(f"**💰 Precio:** ${wine['price']:.0f}")
+            st.markdown(f"**📈 Popularidad:** {int(wine["rating_qty"])} reviews")
             
             # Características de sabor
             st.markdown("**👅 Perfil de Sabor:**")
@@ -952,19 +953,27 @@ def show_wine_results(trained_model):
             taste_characteristics = ['body', 'tannins', 'sweetness', 'acidity']
             taste_emojis = ['🏋️', '🌿', '🍯', '🍋']
             
-            for i, (char, emoji) in enumerate(zip(taste_characteristics, taste_emojis)):
+            # Get main pairing to classify wine intensities
+            meal_info = meals_df[meals_df.iloc[:, 0] == st.session_state.selected_meal].iloc[0]
+            main_pairing = meal_info.iloc[1].lower() if len(meal_info) > 1 else "No especificado"
+
+            for i, (taste, emoji) in enumerate(zip(taste_characteristics, taste_emojis)):
                 with taste_cols[i]:
-                    intensity = wine[char]
+                    intensity = wine[taste]
+                    quantiles = user._taste_profiles[main_pairing][taste]
+                    intensity_label, _ = user._get_category(intensity, quantiles)
+
                     # Crear indicador visual
                     intensity_levels = {"leve": 1, "moderado": 2, "marcado": 3, "intenso": 4}
-                    level = intensity_levels.get(intensity, 2)
+                    level = intensity_levels.get(intensity_label, 2)
                     bars = "█" * level + "░" * (4 - level)
                     
                     st.markdown(f"""
                     <div style="text-align: center; font-size: 0.8em;">
                         <div>{emoji}</div>
                         <div style="font-family: monospace; color: #666; font-size: 0.7em;">{bars}</div>
-                        <div style="color: #888;">{intensity}</div>
+                        <div style="color: #888;">{intensity_label.title()}</div>
+                        <div style="color: #888;">{intensity:.1%}</div>
                     </div>
                     """, unsafe_allow_html=True)
             
@@ -1101,7 +1110,7 @@ def show_wine_feedback():
         try:
             st.markdown(f"""
                 <div style="display: flex; justify-content: center; margin: 10px 0;">
-                    <img src="{wine["image"]}" width="50" style="border-radius: 5px;">
+                    <img src="{wine["image"]}" width="70" style="border-radius: 5px;">
                 </div>
                 """, unsafe_allow_html=True)
         except:
@@ -1121,10 +1130,12 @@ def show_wine_feedback():
             """, unsafe_allow_html=True)
     
     with wine_col2:
-        st.markdown(f"#### 🍷 {wine['name']}")
+        st.markdown(f"#### 🍷 {wine['name']} - {int(wine["year"])}")
         st.markdown(f"**🏭 Bodega:** {wine['winery']}")
         #st.markdown(f"**📍 Región:** {wine['region']}")
+        st.markdown(f"**⭐ Rating:** {wine['rating']:.1f}")
         st.markdown(f"**💰 Precio:** ${wine['price']:.0f}")
+        st.markdown(f"**📈 Popularidad:** {int(wine["rating_qty"])} reviews")
         st.markdown(f"**🎯 Match Predicho:** {wine['prediction_score']:.1%}")
         
         # Características de sabor
