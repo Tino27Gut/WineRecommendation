@@ -8,7 +8,7 @@ import random
 from src.utils import utils as ut
 from models.synthetic_user import SyntheticUserSimulator
 
-# TODO: INCLUIR IMÁGENES DE VINOS, MEJORAR PREFORMANCE, CORREGIR OPCIONES DE "AJUSTAR FILTROS", MEJORAR CONTADOR DE INTENSIDAD EN VINOS, PONER ÍCONOS DE SABOR EN PÁGINA DE AGRADECIMIENTO.
+# TODO: MEJORAR PREFORMANCE, CORREGIR OPCIONES DE "AJUSTAR FILTROS", MEJORAR CONTADOR DE INTENSIDAD EN VINOS, PONER ÍCONOS DE SABOR EN PÁGINA DE AGRADECIMIENTO.
 
 wine_df = pd.read_csv(ut.get_project_file_path("src", "data", "transformed", "wines_clean.csv"))
 wine_df = wine_df.reset_index(drop=False)
@@ -587,58 +587,58 @@ def show_grape_selection():
     
     st.markdown("### 🍇 Elige las Variedades de Uva")
     st.markdown("Selecciona una o más variedades de uva que te gustaría probar.")
-    
+
     # Definir las uvas con información
     grape_info = {
-        'malbec': {
+        'Malbec': {
             'name': 'Malbec',
             'emoji': '🍇',
             'description': 'Tinta argentina por excelencia, intensa y frutal',
             'characteristics': 'Cuerpo medio-alto, taninos suaves, notas de ciruela'
         },
-        'cabernet_sauvignon': {
+        'Cabernet Sauvignon': {
             'name': 'Cabernet Sauvignon',
             'emoji': '🍷',
             'description': 'Rey de los tintos, estructura y elegancia',
             'characteristics': 'Cuerpo alto, taninos firmes, notas de cassis'
         },
-        'cabernet_franc': {
+        'Cabernet Franc': {
             'name': 'Cabernet Franc',
             'emoji': '🍇',
             'description': 'Aromática y elegante, más ligera que el Cabernet Sauvignon',
             'characteristics': 'Cuerpo medio, taninos finos, notas de pimiento y frambuesa'
         },
-        'petit_verdot': {
+        'Petit Verdot': {
             'name': 'Petit Verdot',
             'emoji': '🍷',
             'description': 'Potente y concentrada, aporta color y estructura a blends',
             'characteristics': 'Cuerpo alto, taninos intensos, notas florales y especiadas'
         },
-        'merlot': {
+        'Merlot': {
             'name': 'Merlot',
             'emoji': '🍇',
             'description': 'Suave y accesible, ideal para iniciarse',
             'characteristics': 'Cuerpo medio, taninos suaves, notas de cereza'
         },
-        'pinot_noir': {
+        'Pinot Noir': {
             'name': 'Pinot Noir',
             'emoji': '🍷',
             'description': 'Elegante y compleja, la diva de los tintos',
             'characteristics': 'Cuerpo ligero-medio, taninos delicados, notas terrosas'
         },
-        'syrah': {
+        'Syrah/Shiraz': {
             'name': 'Syrah/Shiraz',
             'emoji': '🍇',
             'description': 'Especiada y potente, gran personalidad',
             'characteristics': 'Cuerpo alto, taninos medios, notas especiadas'
         },
-        'chardonnay': {
+        'Chardonnay': {
             'name': 'Chardonnay',
             'emoji': '🥂',
             'description': 'Blanco versátil, desde fresco a cremoso',
             'characteristics': 'Cuerpo variable, acidez balanceada, notas de manzana'
         },
-        'otras_uvas': {
+        'Otras Uvas': {
             'name': 'Otras Variedades',
             'emoji': '🎭',
             'description': 'Variedades menos comunes pero interesantes',
@@ -687,7 +687,7 @@ def show_grape_selection():
         st.success(f"🍇 **{len(selected_grapes)} variedades:** {display_text}")
     else:
         st.info("ℹ️ **Sin selección específica** - Se considerarán todas las variedades disponibles")
-    
+
     # Botón para continuar
     if st.button("🔍 Buscar Vinos", type="primary"):
         st.session_state.selected_grapes = selected_grapes
@@ -697,7 +697,7 @@ def show_grape_selection():
 # RESULTADOS DE VINOS
 def show_wine_results(trained_model):
     st.markdown('<div class="subsection-header">🍷 Recomendaciones Personalizadas</div>', unsafe_allow_html=True)
-    
+
     # Navegación
     nav_col1, nav_col2 = st.columns([1, 4])
     with nav_col1:
@@ -717,6 +717,7 @@ def show_wine_results(trained_model):
             # Aplicar filtros
             wine_base = wine_df.copy()
             wine_base.columns = wine_base.columns.str.lower() # Estandariza columnas (lower case)
+            # TODO: no está tomando 'syrah/shiraz' bien. Revisar.
             
             # Filtro por pairings
             if user_pairings:
@@ -739,6 +740,16 @@ def show_wine_results(trained_model):
             # Filtro por uvas
             if st.session_state.selected_grapes:
                 selected_grapes = [g.lower() for g in st.session_state.selected_grapes]
+                
+                # Adds column "Otras Uvas" if selected by user
+                if "otras uvas" in selected_grapes:
+                    grapes_for_selection = [
+                        'malbec', 'cabernet sauvignon', 'cabernet franc', 'petit verdot',
+                        'merlot', 'pinot noir', 'syrah/shiraz', 'chardonnay'
+                    ]
+                    other_grapes = [g.lower() for g in grapes_list if g not in grapes_for_selection]
+                    wine_base["otras uvas"] = (wine_base[other_grapes].sum(axis=1) > 0).astype(int)
+
                 grape_filtered = wine_base[wine_base[selected_grapes].sum(axis=1) > 0]
                 if len(grape_filtered) > 0:
                     wine_base = grape_filtered
@@ -886,20 +897,28 @@ def show_wine_results(trained_model):
         
         with wine_col1:
             # Imagen del vino (placeholder)
-            st.markdown(f"""
-            <div style="
-                background: linear-gradient(135deg, #8B0000, #DC143C);
-                border-radius: 15px;
-                height: 200px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-size: 3em;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-                margin: 10px 0;
-            ">🍷</div>
-            """, unsafe_allow_html=True)
+            try:
+                st.markdown(f"""
+                <div style="display: flex; justify-content: center; margin: 10px 0;">
+                    <img src="{wine["image"]}" width="50" style="border-radius: 5px;">
+                </div>
+                """, unsafe_allow_html=True)
+            except:
+                # Fallback a tu placeholder original si la imagen no carga
+                st.markdown(f"""
+                <div style="
+                    background: linear-gradient(135deg, #8B0000, #DC143C);
+                    border-radius: 15px;
+                    height: 200px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    font-size: 3em;
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                    margin: 10px 0;
+                ">🍷</div>
+                """, unsafe_allow_html=True)
             
             # Puntuación
             score = wine['prediction_score']
@@ -994,7 +1013,7 @@ def show_wine_results(trained_model):
             st.markdown("---")
     
     # Controles de paginación
-    st.markdown("### 📄 Navegación")
+    st.markdown("---")
     
     pagination_col1, pagination_col2, pagination_col3 = st.columns([1, 2, 1])
     
@@ -1019,7 +1038,6 @@ def show_wine_results(trained_model):
     
     # Opciones adicionales
     st.markdown("---")
-    st.markdown("### 🔄 Opciones Adicionales")
     
     option_col1, option_col2, option_col3 = st.columns(3)
     
@@ -1080,20 +1098,27 @@ def show_wine_feedback():
     wine_col1, wine_col2 = st.columns([1, 2])
     
     with wine_col1:
-        st.markdown(f"""
-        <div style="
-            background: linear-gradient(135deg, #8B0000, #DC143C);
-            border-radius: 15px;
-            height: 200px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 4em;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            margin: 20px 0;
-        ">🍷</div>
-        """, unsafe_allow_html=True)
+        try:
+            st.markdown(f"""
+                <div style="display: flex; justify-content: center; margin: 10px 0;">
+                    <img src="{wine["image"]}" width="50" style="border-radius: 5px;">
+                </div>
+                """, unsafe_allow_html=True)
+        except:
+            st.markdown(f"""
+            <div style="
+                background: linear-gradient(135deg, #8B0000, #DC143C);
+                border-radius: 15px;
+                height: 200px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 4em;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                margin: 20px 0;
+            ">🍷</div>
+            """, unsafe_allow_html=True)
     
     with wine_col2:
         st.markdown(f"#### 🍷 {wine['name']}")
