@@ -6,9 +6,10 @@ import plotly.graph_objects as go
 from datetime import datetime
 import random
 from src.utils import utils as ut
+
 from models.synthetic_user import SyntheticUserSimulator
 
-# TODO: MEJORAR PREFORMANCE, CORREGIR OPCIONES DE "AJUSTAR FILTROS", PONER ÍCONOS DE SABOR EN PÁGINA DE SELECCIÓN VINO / AGRADECIMIENTO.
+# TODO: MEJORAR PREFORMANCE.
 
 wine_df = pd.read_csv(ut.get_project_file_path("src", "data", "transformed", "wines_clean.csv"))
 wine_df = wine_df.reset_index(drop=False)
@@ -703,6 +704,12 @@ def show_wine_results(trained_model):
     with nav_col1:
         if st.button("← Cambiar Uvas"):
             st.session_state.page = 'grape_selection'
+            
+            # Eliminar predicción de la session
+            keys_to_delete = ["filtered_wines", "wine_predictions"]
+            for key in keys_to_delete:
+                del st.session_state[key]
+
             st.rerun()
     
     # Procesar filtros solo una vez
@@ -859,7 +866,7 @@ def show_wine_results(trained_model):
             reset_session()
             st.rerun()
         return
-    
+
     # Paginación - mostrar 3 vinos por página
     wines_per_page = 3
     total_pages = (len(filtered_wines) + wines_per_page - 1) // wines_per_page
@@ -887,9 +894,34 @@ def show_wine_results(trained_model):
     with stats_col4:
         best_score = filtered_wines['prediction_score'].iloc[0]
         st.metric("⭐ Mejor Match", f"{best_score:.1%}")
+
+    # Selector de orden de vinos
+
+    # TODO: terminar de ordenar esto para que haga el orden sobre todos los vinos, no solo current_wines
+
+    sort_options = {
+        "Match": "prediction_score", "Rating": "rating", "Precio": "price", "Popularidad": "rating_qty"
+    }
+
+    sorter = st.selectbox(
+        "Ordenar Por",
+        options=sort_options.keys(),
+        index=0,
+        help="Elige la comida para la cual quieres encontrar el vino ideal"
+    )
+
+    order_cardinality = st.radio(
+        "Ordenar de:",
+        ["Mayor a Menor", "Menor a Mayor"],
+        horizontal=True
+    )
+
+    is_ascending = True if order_cardinality == "Menor a Mayor" else False
+
+    current_wines = current_wines.sort_values(by=sort_options.get(sorter), ascending=is_ascending)
     
     st.markdown("---")
-    
+
     # Mostrar vinos de la página actual
     for idx, (_, wine) in enumerate(current_wines.iterrows()):
         wine_col1, wine_col2, wine_col3 = st.columns([1, 2, 1])
@@ -1048,7 +1080,7 @@ def show_wine_results(trained_model):
     # Opciones adicionales
     st.markdown("---")
     
-    option_col1, option_col2, option_col3 = st.columns(3)
+    option_col1, option_col2 = st.columns(2)
     
     with option_col1:
         if st.button("🔄 Comenzar Nueva Búsqueda"):
@@ -1058,42 +1090,49 @@ def show_wine_results(trained_model):
     with option_col2:
         if st.button("⚙️ Ajustar Filtros"):
             st.session_state.page = 'meal_selection'
+
+            # Eliminar predicción de la session
+            keys_to_delete = ["filtered_wines", "wine_predictions"]
+            for key in keys_to_delete:
+                del st.session_state[key]
+
             # Mantener algunos datos para facilitar la edición
             st.rerun()
     
-    with option_col3:
-        if st.button("📊 Ver Estadísticas Detalladas"):
-            show_detailed_statistics(filtered_wines)
+    # with option_col3:
+    #     if st.button("📊 Ver Estadísticas Detalladas"):
+    #         show_detailed_statistics(filtered_wines)
 
-def show_detailed_statistics(filtered_wines):
-    """Muestra estadísticas detalladas de los vinos filtrados"""
-    st.markdown("### 📊 Análisis Detallado de Resultados")
+# Good idea to implement some other time
+# def show_detailed_statistics(filtered_wines):
+#     """Muestra estadísticas detalladas de los vinos filtrados"""
+#     st.markdown("### 📊 Análisis Detallado de Resultados")
     
-    # Distribución de puntuaciones
-    st.markdown("#### 🎯 Distribución de Puntuaciones de Match")
+#     # Distribución de puntuaciones
+#     st.markdown("#### 🎯 Distribución de Puntuaciones de Match")
     
-    fig_scores = px.histogram(
-        filtered_wines, 
-        x='prediction_score',
-        nbins=20,
-        title="Distribución de Probabilidades de Match",
-        labels={'prediction_score': 'Probabilidad de Match', 'count': 'Cantidad de Vinos'}
-    )
-    fig_scores.update_layout(showlegend=False)
-    st.plotly_chart(fig_scores, use_container_width=True)
+#     fig_scores = px.histogram(
+#         filtered_wines, 
+#         x='prediction_score',
+#         nbins=20,
+#         title="Distribución de Probabilidades de Match",
+#         labels={'prediction_score': 'Probabilidad de Match', 'count': 'Cantidad de Vinos'}
+#     )
+#     fig_scores.update_layout(showlegend=False)
+#     st.plotly_chart(fig_scores, use_container_width=True)
     
-    # Análisis por precio
-    st.markdown("#### 💰 Relación Precio vs Match")
+#     # Análisis por precio
+#     st.markdown("#### 💰 Relación Precio vs Match")
     
-    fig_price = px.scatter(
-        filtered_wines,
-        x='price',
-        y='prediction_score',
-        title="Precio vs Probabilidad de Match",
-        labels={'price': 'Precio ($)', 'prediction_score': 'Probabilidad de Match'},
-        hover_data=['wine_name', 'winery']
-    )
-    st.plotly_chart(fig_price, use_container_width=True)
+#     fig_price = px.scatter(
+#         filtered_wines,
+#         x='price',
+#         y='prediction_score',
+#         title="Precio vs Probabilidad de Match",
+#         labels={'price': 'Precio ($)', 'prediction_score': 'Probabilidad de Match'},
+#         hover_data=['name', 'winery']
+#     )
+#     st.plotly_chart(fig_price, use_container_width=True)
 
 # FEEDBACK DEL VINO
 def show_wine_feedback():
@@ -1137,11 +1176,37 @@ def show_wine_feedback():
         st.markdown(f"**💰 Precio:** ${wine['price']:.0f}")
         st.markdown(f"**📈 Popularidad:** {int(wine["rating_qty"])} reviews")
         st.markdown(f"**🎯 Match Predicho:** {wine['prediction_score']:.1%}")
-        
-        # Características de sabor
         st.markdown("**👅 Perfil de Sabor:**")
-        taste_info = f"Cuerpo {wine['body']}, Taninos {wine['tannins']}, Dulzura {wine['sweetness']}, Acidez {wine['acidity']}"
-        st.markdown(f"*{taste_info}*")
+        
+        taste_characteristics = ['body', 'tannins', 'sweetness', 'acidity']
+        taste_emojis = ['🏋️', '🌿', '🍯', '🍋']
+        
+        taste_cols = st.columns(4)
+
+        # Get main pairing to classify wine intensities
+        meal_info = meals_df[meals_df.iloc[:, 0] == st.session_state.selected_meal].iloc[0]
+        main_pairing = meal_info.iloc[1].lower() if len(meal_info) > 1 else "No especificado"
+
+        for i, (taste, emoji) in enumerate(zip(taste_characteristics, taste_emojis)):
+            with taste_cols[i]:
+                intensity = wine[taste]
+                quantiles = user._taste_profiles[main_pairing][taste]
+                intensity_label, _ = user._get_category(intensity, quantiles)
+
+                # Crear indicador visual
+                intensity_levels = {"leve": 1, "moderado": 2, "marcado": 3, "intenso": 4}
+                level = intensity_levels.get(intensity_label, 2)
+                bars = "█" * level + "░" * (4 - level)
+                
+                st.markdown(f"""
+                <div style="text-align: center; font-size: 0.8em;">
+                    <div>{taste.title()}</div>
+                    <div>{emoji}</div>
+                    <div style="font-family: monospace; color: #666; font-size: 0.7em;">{bars}</div>
+                    <div style="color: #888;">{intensity_label.title()}</div>
+                    <div style="color: #888;">{intensity:.1%}</div>
+                </div>
+                """, unsafe_allow_html=True)
     
     st.markdown("---")
     
@@ -1172,19 +1237,20 @@ def show_wine_feedback():
     
     # Información sobre el feedback
     st.markdown("---")
-    st.markdown("""
-    ### ℹ️ Sobre tu Feedback
-    
-    **¿Para qué usamos tu respuesta?**
-    - 📈 Mejoramos la precisión de nuestro modelo de recomendaciones
-    - 🎯 Personalizamos futuras sugerencias para usuarios con gustos similares
-    - 📊 Analizamos patrones de preferencias por región, precio y tipo de vino
-    
-    **Tu privacidad:**
-    - No guardamos información personal identificable
-    - Los datos se usan únicamente para mejorar el sistema
-    - Puedes solicitar la eliminación de tus datos en cualquier momento
-    """)
+    with st.expander("¿Qué hacemos con tu feedback?"):
+        st.markdown("""
+        ### ℹ️ Sobre tu Feedback
+        
+        **¿Para qué usamos tu respuesta?**
+        - 📈 Mejoramos la precisión de nuestro modelo de recomendaciones
+        - 🎯 Personalizamos futuras sugerencias para usuarios con gustos similares
+        - 📊 Analizamos patrones de preferencias por región, precio y tipo de vino
+        
+        **Tu privacidad:**
+        - No guardamos información personal identificable
+        - Los datos se usan únicamente para mejorar el sistema
+        - Puedes solicitar la eliminación de tus datos en cualquier momento
+        """)
 
 # PÁGINA DE AGRADECIMIENTO
 def show_feedback_thanks():
