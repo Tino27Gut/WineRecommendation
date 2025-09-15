@@ -426,9 +426,9 @@ def _calc_next_exp_val(
         - Valor económico esperado ajustado según la calidad de la segunda recomendación.
     """
     if type == "TN":
-        actual_recommendation_exp_val = (1 - churn_dislike)
+        actual_recommendation_exp_val = (churn_dislike) # valor esperado si la recomendación es mala (avg tkt x prob irse habiéndole disgustado)
     elif type == "FN":
-        actual_recommendation_exp_val = (1 - churn_like)
+        actual_recommendation_exp_val = (1 - churn_like) # valor esperado si la recomendación es buena (avg tkt x prob quedarse habiéndole gustado)
     else:
         raise Exception("Type is not recognized. Only TN and FN types are accepted!")
     
