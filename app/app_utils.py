@@ -536,6 +536,8 @@ def create_model_datasets(recommend_df, grapes_list, region_list, pairings_list)
             "user_id", "user_input", "prob_like", "user_main_pairing"  # Columnas de datos sintéticos
         ]
         
+        idx_user_id = recommend_df["user_id"]
+        
         model_df = recommend_df.drop(columns=columns_to_drop).copy()
 
         # Dataset sin one-hot encoding (quita uvas y regiones)
@@ -544,7 +546,7 @@ def create_model_datasets(recommend_df, grapes_list, region_list, pairings_list)
         # Dataset sin columnas categóricas (quita maridajes también)
         model_df_nocat = model_df_nooh.drop(columns=pairings_list).copy()
 
-        return model_df, model_df_nooh, model_df_nocat
+        return model_df, model_df_nooh, model_df_nocat, idx_user_id
         
     except Exception as e:
         st.error(f"Error creando datasets de modelado: {str(e)}")
@@ -580,7 +582,7 @@ def get_complete_datasets(ut):
             return None
         
         # Crear datasets de modelado
-        model_df, model_df_nooh, model_df_nocat = create_model_datasets(
+        model_df, model_df_nooh, model_df_nocat, idx_user_id = create_model_datasets(
             recommend_df, grapes_list, region_list, pairings_list
         )
         
@@ -598,7 +600,8 @@ def get_complete_datasets(ut):
             'model_df_nocat': model_df_nocat,
             'grapes_list': grapes_list,
             'region_list': region_list,
-            'pairings_list': pairings_list
+            'pairings_list': pairings_list,
+            "idx_user_id": idx_user_id
         }
         
         return datasets
@@ -761,7 +764,9 @@ def evaluate_model(pipeline, X, y, features, avg_tkt, churn_like, churn_dislike,
         "y_test_proba": y_test_proba,
         "y_train_true": y_train,
         "y_train_proba": y_train_proba,
-        "pipeline": pipeline
+        "pipeline": pipeline,
+        # - Cantidad de usuarios de test
+        "X_test": X_test
     }
 
 
