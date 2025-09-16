@@ -35,7 +35,7 @@ import warnings
 
 from models.synthetic_user import SyntheticUserSimulator
 from src.utils import utils as ut
-from app_utils import plot_learning_curve, display_feature_tags, display_hyperparameters, plot_validation_curve_plotly, plot_feature_importance, get_complete_datasets, plot_selectkbest, evaluate_pipeline, evaluate_model, plot_roc_curve
+from app_utils import plot_learning_curve, display_feature_tags, display_hyperparameters, get_complete_datasets, plot_selectkbest, evaluate_pipeline, evaluate_model, plot_roc_curve
 import interactive as it
 
 warnings.filterwarnings('ignore')
@@ -225,7 +225,7 @@ def show_introduction():
         ### 🔬 Hipótesis
         
         **Hipótesis Principal:**
-        - Existe una mayor probabilidad de que a un usuario le guste un vino si este cumple con sus demandas de sabor y calidad.
+        - Un usuario acaba siendo más rentable si se le recomiendan vinos que cumplan con sus demandas de sabor y calidad.
         
         **Hipótesis Secundarias:**
         1. El usuario valora vinos con buen rating percibido por otros usuarios.
@@ -2893,7 +2893,7 @@ def show_conclusions():
     # Resumen ejecutivo
     st.markdown('<div class="subsection-header">📊 Resumen Ejecutivo</div>', unsafe_allow_html=True)
     
-    summary_col1, summary_col2 = st.columns(2)
+   # summary_col1, summary_col2, summary_col3 = st.columns([3, 5, 5])
     
     if st.session_state.eco_result and st.session_state.test_users_qty:
         profit_per_user = round(st.session_state.eco_result / st.session_state.test_users_qty)
@@ -2902,9 +2902,19 @@ def show_conclusions():
     else:
         profit_per_user_added = 0
 
+    st.markdown(f"""
+        <div class="metric-container">
+        <h4>🔬 Hipótesis</h4>
+        <p>🏆 El usuario es más rentable con recomendaciones de vinos que cumplan con su expectativa de sabor y calidad.</p>
+        <ul>
+        <li>✅ El usuario valora el rating de otros usuarios (OK - Feature Importance).</li>
+        <li>✅ El usuario valorea vinos con sabores similares a los demandados (OK - Feature Importance).</li>
+        <li>✅ El usuario es más rentable si se le realizan recomendaciones que cumplan sus expectativas (+{profit_per_user_added:.0%} rentabilidad ganada por usuario)</li>
+        </ul>
+        </div>
+        """, unsafe_allow_html=True)
 
-    with summary_col1:
-        st.markdown(f"""
+    st.markdown(f"""
         <div class="metric-container">
         <h4>🎯 Objetivos Cumplidos</h4>
         <ul>
@@ -2914,18 +2924,26 @@ def show_conclusions():
         </ul>
         </div>
         """, unsafe_allow_html=True)
-    
-    with summary_col2:
-        st.markdown(f"""
+
+    if st.session_state.eco_result and st.session_state.test_roc_auc and st.session_state.test_accuracy:
+        key_results = f"""<li>Ganancia: ${st.session_state.eco_result:,.0f}</li>
+                          <li>AUC: {st.session_state.test_roc_auc:.4f}</li>
+                          <li>Accuracy: {st.session_state.test_accuracy:.0%}</li>
+                        """ 
+    else:
+        key_results = "<li>Modelo aún no evaluado. Ejecuta la sección '📈 Selección del Mejor Modelo'</li>"
+
+    st.markdown(f"""
         <div class="metric-container">
         <h4>📈 Resultados Clave</h4>
         <ul>
-        <li>Ganancia: ${st.session_state.eco_result:,.0f}</li>
-        <li>AUC: {st.session_state.test_roc_auc:.4f}</li>
-        <li>Accuracy: {st.session_state.test_accuracy:.0%}</li>
+        {key_results}
         </ul>
         </div>
         """, unsafe_allow_html=True)
+
+    
+    
     
     
     # Lecciones aprendidas
