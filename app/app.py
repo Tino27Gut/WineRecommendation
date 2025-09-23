@@ -184,7 +184,7 @@ def show_introduction():
         
         <h3>👩‍🏫 Participantes</h3>
         <p><strong>Alumno:</strong> Martín Augusto Gutiérrez</p>
-        <p><strong>Tutores:</strong> Ignacio Urteaga, Julio Paredes, Anahí Romo Santagostino</p>
+        <p><strong>Tutores:</strong> Julio Paredes</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -846,7 +846,7 @@ def show_eda():
         <ol>
         <li><strong>Target continuo:</strong> Usar rating como proxy de probabilidad de gusto del usuario basado en rangos de sabor personalizados y precio.</li>
         <li><strong>Simplificación por maridaje:</strong> Preconfigurar rangos de sabor según el maridaje seleccionado para garantizar coherencia.</li>
-        <li><strong>Factores principales:</strong> Priorizar precio (con tope), sabores coherentes con maridaje y uvas principales para determinar probabilidad de gusto (like).</li>
+        <li><strong>Factores principales:</strong> Priorizar precio (con tope), perfiles de sabor coherentes con maridaje y preferencias de usuario para determinar probabilidad de gusto (like).</li>
         <li><strong>Factores secundarios:</strong> Uvas y notas como variables de apoyo, no determinantes.</li>
         <li><strong>Efecto social:</strong> Incorporar popularidad como factor de influencia - vinos más consumidos generan mayor probabilidad de adopción.</li>
         </ol>
@@ -2908,7 +2908,7 @@ def show_conclusions():
         <p>🏆 El usuario es más rentable con recomendaciones de vinos que cumplan con su expectativa de sabor y calidad.</p>
         <ul>
         <li>✅ El usuario valora el rating de otros usuarios (OK - Feature Importance).</li>
-        <li>✅ El usuario valorea vinos con sabores similares a los demandados (OK - Feature Importance).</li>
+        <li>✅ El usuario valora vinos con sabores similares a los demandados (OK - Feature Importance).</li>
         <li>✅ El usuario es más rentable si se le realizan recomendaciones que cumplan sus expectativas (+{profit_per_user_added:.0%} rentabilidad ganada por usuario)</li>
         </ul>
         </div>
