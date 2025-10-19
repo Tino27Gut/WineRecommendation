@@ -141,6 +141,7 @@ def display_feature_tags(features, tags_per_row=5):
             with cols[k]:
                 st.empty()
 
+
 def display_hyperparameters(params_dict):
     """
     Muestra los hiperparámetros de forma estilizada
@@ -156,123 +157,6 @@ def display_hyperparameters(params_dict):
         params_text += f"- **{param}**: **`{value}`**\n"
     
     st.markdown(params_text)
-
-def plot_validation_curve_plotly(pipeline, X, y, cv, param_name, param_range, 
-                                model_name="Classifier", scoring="roc_auc"):
-    """
-    Genera y muestra una curva de validación usando Plotly
-    
-    Parameters:
-    -----------
-    pipeline : sklearn pipeline
-        Pipeline del modelo
-    X : array-like
-        Features
-    y : array-like
-        Target variable
-    cv : cross-validation object
-        Objeto de validación cruzada
-    param_name : str
-        Nombre del parámetro a validar (ej: 'rf__n_estimators')
-    param_range : list
-        Rango de valores del parámetro
-    model_name : str
-        Nombre del modelo para el título
-    scoring : str
-        Métrica para evaluar (default: 'roc_auc')
-    """
-    
-    with st.spinner(f'Generando curva de validación para {model_name}...'):
-        try:
-            train_scores, test_scores = validation_curve(
-                estimator=pipeline,
-                X=X,
-                y=y,
-                param_name=param_name,
-                param_range=param_range,
-                cv=cv,
-                scoring=scoring,
-                n_jobs=-1
-            )
-
-            train_mean = train_scores.mean(axis=1)
-            train_std = train_scores.std(axis=1)
-            test_mean = test_scores.mean(axis=1)
-            test_std = test_scores.std(axis=1)
-
-            # Crear gráfico con Plotly
-            fig = go.Figure()
-
-            # Training scores
-            fig.add_trace(go.Scatter(
-                x=param_range,
-                y=train_mean,
-                mode='lines+markers',
-                name=f'Train {scoring.upper()}',
-                line=dict(color='#1f77b4', width=2),
-                marker=dict(size=8),
-                error_y=dict(
-                    type='data',
-                    array=train_std,
-                    visible=True,
-                    color='#1f77b4',
-                    thickness=1.5,
-                    width=3
-                )
-            ))
-
-            # Test scores
-            fig.add_trace(go.Scatter(
-                x=param_range,
-                y=test_mean,
-                mode='lines+markers',
-                name=f'Test {scoring.upper()}',
-                line=dict(color='#ff7f0e', width=2),
-                marker=dict(size=8, symbol='square'),
-                error_y=dict(
-                    type='data',
-                    array=test_std,
-                    visible=True,
-                    color='#ff7f0e',
-                    thickness=1.5,
-                    width=3
-                )
-            ))
-
-            # Configurar layout
-            param_display = param_name.split('__')[-1] if '__' in param_name else param_name
-            fig.update_layout(
-                title=f"Curva de Validación - {param_display} ({model_name})",
-                xaxis_title=param_display,
-                yaxis_title=f"{scoring.upper()} Score",
-                template="plotly_white",
-                height=400,
-                showlegend=True,
-                legend=dict(x=0.7, y=0.1)
-            )
-
-            fig.update_xaxis(showgrid=True, gridwidth=1, gridcolor='lightgray')
-            fig.update_yaxis(showgrid=True, gridwidth=1, gridcolor='lightgray')
-
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Mostrar métricas del mejor parámetro
-            best_idx = np.argmax(test_mean)
-            best_param_val = param_range[best_idx]
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Mejor Parámetro", f"{best_param_val}")
-            with col2:
-                st.metric(f"Train {scoring.upper()}", f"{train_mean[best_idx]:.3f}")
-            with col3:
-                st.metric(f"Test {scoring.upper()}", f"{test_mean[best_idx]:.3f}")
-            
-            return train_scores, test_scores
-            
-        except Exception as e:
-            st.error(f"Error al generar la curva de validación: {str(e)}")
-            return None, None
 
 
 def plot_feature_importance(model, feature_names, model_name="Random Forest", top_n=15):
@@ -536,6 +420,8 @@ def create_model_datasets(recommend_df, grapes_list, region_list, pairings_list)
             "user_id", "user_input", "prob_like", "user_main_pairing"  # Columnas de datos sintéticos
         ]
         
+        idx_user_id = recommend_df["user_id"]
+        
         model_df = recommend_df.drop(columns=columns_to_drop).copy()
 
         # Dataset sin one-hot encoding (quita uvas y regiones)
@@ -544,7 +430,7 @@ def create_model_datasets(recommend_df, grapes_list, region_list, pairings_list)
         # Dataset sin columnas categóricas (quita maridajes también)
         model_df_nocat = model_df_nooh.drop(columns=pairings_list).copy()
 
-        return model_df, model_df_nooh, model_df_nocat
+        return model_df, model_df_nooh, model_df_nocat, idx_user_id
         
     except Exception as e:
         st.error(f"Error creando datasets de modelado: {str(e)}")
@@ -580,7 +466,7 @@ def get_complete_datasets(ut):
             return None
         
         # Crear datasets de modelado
-        model_df, model_df_nooh, model_df_nocat = create_model_datasets(
+        model_df, model_df_nooh, model_df_nocat, idx_user_id = create_model_datasets(
             recommend_df, grapes_list, region_list, pairings_list
         )
         
@@ -598,7 +484,8 @@ def get_complete_datasets(ut):
             'model_df_nocat': model_df_nocat,
             'grapes_list': grapes_list,
             'region_list': region_list,
-            'pairings_list': pairings_list
+            'pairings_list': pairings_list,
+            "idx_user_id": idx_user_id
         }
         
         return datasets
@@ -761,7 +648,9 @@ def evaluate_model(pipeline, X, y, features, avg_tkt, churn_like, churn_dislike,
         "y_test_proba": y_test_proba,
         "y_train_true": y_train,
         "y_train_proba": y_train_proba,
-        "pipeline": pipeline
+        "pipeline": pipeline,
+        # - Cantidad de usuarios de test
+        "X_test": X_test
     }
 
 

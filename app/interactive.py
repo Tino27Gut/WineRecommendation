@@ -92,14 +92,14 @@ def reset_session():
     st.session_state.current_wine_page = 0
 
 def save_feedback_to_csv(wine_data, liked):
-    """Guarda el feedback en un CSV - IMPLEMENTAR según tus necesidades"""
+    """Guarda el feedback en un CSV - No implementado"""
     feedback_row = wine_data.copy()
     feedback_row['liked'] = 1 if liked else 0
     feedback_row['timestamp'] = datetime.now().isoformat()
     
     st.session_state.feedback_data.append(feedback_row)
     
-    # En implementación real, guardarías en un CSV:
+    # En implementación real, se guardaría en un CSV:
     # feedback_df = pd.DataFrame(st.session_state.feedback_data)
     # feedback_df.to_csv('wine_feedback.csv', index=False)
     

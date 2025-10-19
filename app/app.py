@@ -1,3 +1,4 @@
+# source /home/martingut27/WineRecommendation/.venv/bin/activate
 # streamlit run /home/martingut27/WineRecommendation/app/app.py
 
 import streamlit as st
@@ -34,7 +35,7 @@ import warnings
 
 from models.synthetic_user import SyntheticUserSimulator
 from src.utils import utils as ut
-from app_utils import plot_learning_curve, display_feature_tags, display_hyperparameters, plot_validation_curve_plotly, plot_feature_importance, get_complete_datasets, plot_selectkbest, evaluate_pipeline, evaluate_model, plot_roc_curve
+from app_utils import plot_learning_curve, display_feature_tags, display_hyperparameters, get_complete_datasets, plot_selectkbest, evaluate_pipeline, evaluate_model, plot_roc_curve
 import interactive as it
 
 warnings.filterwarnings('ignore')
@@ -102,6 +103,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def main():
+    # Setear session inicial
+    if "eco_result" not in st.session_state:
+        st.session_state.eco_result = None
+    if "test_users_qty" not in st.session_state:
+        st.session_state.test_users_qty = None
+    if "test_roc_auc" not in st.session_state:
+        st.session_state.test_roc_auc = None
+    if "test_accuracy" not in st.session_state:
+        st.session_state.test_accuracy = None
+    if "total_spend" not in st.session_state:
+        st.session_state.total_spend = None
+
     # Sidebar para navegación
     st.sidebar.markdown("## 🧭 Navegación")
     page = st.sidebar.selectbox(
@@ -133,6 +146,16 @@ def main():
         show_interactive_app()
 
 
+@st.cache_data
+def load_data():
+    # Loading de data utilizada a lo largo de la app
+    dataset_dicts = get_complete_datasets(ut)
+
+    return dataset_dicts
+
+dataset_dicts = load_data()
+
+
 
 
 
@@ -148,7 +171,7 @@ def show_introduction():
     st.markdown('<div class="main-header">📊 Proyecto Final - Diplomatura en Data Science</div>', unsafe_allow_html=True)
     
     # Información del proyecto
-    col1, col2 = st.columns([2, 1])
+    col1, col2 = st.columns([3, 2])
     
     with col1:
         st.markdown('<div class="section-header">📋 Información del Proyecto</div>', unsafe_allow_html=True)
@@ -161,7 +184,7 @@ def show_introduction():
         
         <h3>👩‍🏫 Participantes</h3>
         <p><strong>Alumno:</strong> Martín Augusto Gutiérrez</p>
-        <p><strong>Tutores:</strong> Ignacio Urteaga, Julio Paredes, Anahí Romo Santagostino</p>
+        <p><strong>Tutores:</strong> Julio Paredes</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -169,15 +192,15 @@ def show_introduction():
         st.markdown('<div class="section-header">📊 Resumen Ejecutivo</div>', unsafe_allow_html=True)
         
         # Aquí puedes agregar métricas clave de tu proyecto
-        st.markdown('<div class="metric-container">', unsafe_allow_html=True)
-        col_metric1, col_metric2 = st.columns(2)
-        with col_metric1:
-            st.metric("Dataset", "[Tamaño]", "[N° registros]")
-            st.metric("Variables", "[N° features]", "[N° target classes]")
-        with col_metric2:
-            st.metric("Mejor Modelo", "RandomForestClassifier", "[Ganancia %]")
-            st.metric("ROI Estimado", "[Valor]", "[Incremento %]")
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("")
+        with st.container(border=True):
+            col_metric1, col_metric2 = st.columns(2)
+            with col_metric1:
+                st.metric("Compras Users", f"{len(dataset_dicts["users_data"]):,.0f}", f"Vinos {len(dataset_dicts["wine_df"]):,.0f}")
+                st.metric("Variables", f"{len(dataset_dicts["wine_df"].columns)}", "10 Target Variables")
+            with col_metric2:
+                st.metric("Mejor Modelo", "🌳 RF", "Ftr Select + Finetun.")
+                st.metric("Ganancia Estimada", "$21/🙍‍♂️", "+55% Valor Usuario")
     
     # Objetivos e Hipótesis
     st.markdown('<div class="section-header">🎯 Objetivos e Hipótesis</div>', unsafe_allow_html=True)
@@ -194,7 +217,7 @@ def show_introduction():
         **Objetivos Específicos:**
         1. Permitir al usuario seleccionar un comida y preferencias de sabor, precio, uvas y obtener al menos 3 recomendaciones.
         2. Evaluar al menos 2 modelos de ML para la recomendación y mejorar su performance a través de técnicas de finetunning.
-        3. Generar una ganancia a la empresa de $X por usuario tras la aplicacion del Wine Sommelier.
+        3. Aumentar el valor de cada usuario para la empresa al menos en un 50% tras la implementación de Wine Sommelier.
         """)
     
     with col_hip:
@@ -202,7 +225,7 @@ def show_introduction():
         ### 🔬 Hipótesis
         
         **Hipótesis Principal:**
-        - Existe una mayor probabilidad de que a un usuario le guste un vino si este cumple con sus demandas de sabor y calidad.
+        - Un usuario acaba siendo más rentable si se le recomiendan vinos que cumplan con sus demandas de sabor y calidad.
         
         **Hipótesis Secundarias:**
         1. El usuario valora vinos con buen rating percibido por otros usuarios.
@@ -823,7 +846,7 @@ def show_eda():
         <ol>
         <li><strong>Target continuo:</strong> Usar rating como proxy de probabilidad de gusto del usuario basado en rangos de sabor personalizados y precio.</li>
         <li><strong>Simplificación por maridaje:</strong> Preconfigurar rangos de sabor según el maridaje seleccionado para garantizar coherencia.</li>
-        <li><strong>Factores principales:</strong> Priorizar precio (con tope), sabores coherentes con maridaje y uvas principales para determinar probabilidad de gusto (like).</li>
+        <li><strong>Factores principales:</strong> Priorizar precio (con tope), perfiles de sabor coherentes con maridaje y preferencias de usuario para determinar probabilidad de gusto (like).</li>
         <li><strong>Factores secundarios:</strong> Uvas y notas como variables de apoyo, no determinantes.</li>
         <li><strong>Efecto social:</strong> Incorporar popularidad como factor de influencia - vinos más consumidos generan mayor probabilidad de adopción.</li>
         </ol>
@@ -1513,7 +1536,12 @@ def show_synthetic_user_modeling():
             st.markdown("#### 📈 Visualización de Score Conjunto 3D")
             
             # Crear meshgrid
-            price_range = np.linspace(5, min(200, test_user_max_price*1.5), 50)
+            if test_user_max_price is None:
+                mesh_grid_max_price = 9999
+            else:
+                mesh_grid_max_price = test_user_max_price
+
+            price_range = np.linspace(5, min(200, mesh_grid_max_price*1.5), 50)
             rating_range = np.linspace(1.0, 5.0, 50)
             P, R = np.meshgrid(price_range, rating_range)
             Z = np.zeros_like(P)
@@ -1970,9 +1998,6 @@ def show_synthetic_user_modeling():
 
 def show_modeling():
     st.markdown('<div class="section-header">🤖 Modelado y Optimización</div>', unsafe_allow_html=True)
-    
-    # Genera todos los datasets con su ETL
-    dataset_dicts = get_complete_datasets(ut)
 
     # Feature Engineering
     st.markdown('<div class="subsection-header">⚙️ Feature Engineering</div>', unsafe_allow_html=True)
@@ -2542,7 +2567,6 @@ def show_model_selection():
     st.markdown("---")
 
     # Obtención de datos
-    dataset_dicts = get_complete_datasets(ut)
     model_df_nocat = dataset_dicts["model_df_nocat"]
     simulation_params = pd.read_pickle(ut.get_project_file_path("src", "data", "synthetic", "simulation_13_params.pkl"))
     avg_tkt = model_df_nocat["price"].mean()
@@ -2738,6 +2762,25 @@ def show_model_selection():
             st.metric("Accuracy", f"{rf_report.loc['accuracy', "support"]:.1%}", f"{rf_knn_comparison['accuracy']}.pp")
 
 
+    # Ganancia adicional por utilizar modelo
+    st.session_state.eco_result = rf_results['eco_test']
+
+    # Cantidad de usuarios utilizados en la predicción
+    idx_user_id = dataset_dicts["idx_user_id"] # Pandas Series
+    rf_X_test_users = idx_user_id.loc[rf_results["X_test"].index]
+    rf_test_users_qty = rf_X_test_users.nunique()
+    st.session_state.test_users_qty = rf_test_users_qty
+
+    # Resultado ROC-AUC Final
+    st.session_state.test_roc_auc = rf_results['auc_test']
+
+    # Accuracy Final
+    st.session_state.test_accuracy = rf_report.loc["accuracy", "support"]
+
+    # Ganancia sin modelo
+    st.session_state.total_spend = rf_results["X_test"]["price"].sum()
+
+
     st.markdown('<div class="subsection-header">📈 Performance - Modelo Seleccionado</div>', unsafe_allow_html=True)
     performance_col1, performance_col2 = st.columns(2)
 
@@ -2786,7 +2829,6 @@ def show_interactive_app():
     # Training Model for Recommender
 
     # - Aux Info -
-    dataset_dicts = get_complete_datasets(ut)
     model_df_nocat = dataset_dicts["model_df_nocat"]
     simulation_params = pd.read_pickle(ut.get_project_file_path("src", "data", "synthetic", "simulation_13_params.pkl"))
     avg_tkt = model_df_nocat["price"].mean()
@@ -2851,81 +2893,58 @@ def show_conclusions():
     # Resumen ejecutivo
     st.markdown('<div class="subsection-header">📊 Resumen Ejecutivo</div>', unsafe_allow_html=True)
     
-    summary_col1, summary_col2, summary_col3 = st.columns(3)
+   # summary_col1, summary_col2, summary_col3 = st.columns([3, 5, 5])
     
-    with summary_col1:
-        st.markdown("""
+    if st.session_state.eco_result and st.session_state.test_users_qty:
+        profit_per_user = round(st.session_state.eco_result / st.session_state.test_users_qty)
+        spended_per_user = round(st.session_state.total_spend / st.session_state.test_users_qty)
+        profit_per_user_added = round(((profit_per_user + spended_per_user) / spended_per_user) - 1, 4)
+    else:
+        profit_per_user_added = 0
+
+    st.markdown(f"""
+        <div class="metric-container">
+        <h4>🔬 Hipótesis</h4>
+        <p>🏆 El usuario es más rentable con recomendaciones de vinos que cumplan con su expectativa de sabor y calidad.</p>
+        <ul>
+        <li>✅ El usuario valora el rating de otros usuarios (OK - Feature Importance).</li>
+        <li>✅ El usuario valora vinos con sabores similares a los demandados (OK - Feature Importance).</li>
+        <li>✅ El usuario es más rentable si se le realizan recomendaciones que cumplan sus expectativas (+{profit_per_user_added:.0%} rentabilidad ganada por usuario)</li>
+        </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown(f"""
         <div class="metric-container">
         <h4>🎯 Objetivos Cumplidos</h4>
         <ul>
-        <li>✅ Objetivo 1</li>
-        <li>✅ Objetivo 2</li>
-        <li>✅ Objetivo 3</li>
+        <li>✅ Elección de Comida + Preferencias para obtener al menos 3 recomendaciones.</li>
+        <li>✅ Evaluados 3 modelos de ML (KNN, RF, Reg Log) cada uno con finetunning + feature selection.</li>
+        <li>✅ Incrementar el valor del usuario en un 50% tras la utilización de Wine Sommelier (+{profit_per_user_added:.0%})</li>
         </ul>
         </div>
         """, unsafe_allow_html=True)
-    
-    with summary_col2:
-        st.markdown("""
+
+    if st.session_state.eco_result and st.session_state.test_roc_auc and st.session_state.test_accuracy:
+        key_results = f"""<li>Ganancia: ${st.session_state.eco_result:,.0f}</li>
+                          <li>AUC: {st.session_state.test_roc_auc:.4f}</li>
+                          <li>Accuracy: {st.session_state.test_accuracy:.0%}</li>
+                        """ 
+    else:
+        key_results = "<li>Modelo aún no evaluado. Ejecuta la sección '📈 Selección del Mejor Modelo'</li>"
+
+    st.markdown(f"""
         <div class="metric-container">
         <h4>📈 Resultados Clave</h4>
         <ul>
-        <li>Ganancia: $[valor]</li>
-        <li>ROI: [X]%</li>
-        <li>Precisión: [X]%</li>
+        {key_results}
         </ul>
         </div>
         """, unsafe_allow_html=True)
+
     
-    with summary_col3:
-        st.markdown("""
-        <div class="metric-container">
-        <h4>🔍 Hipótesis</h4>
-        <ul>
-        <li>✅ Confirmada</li>
-        <li>❌ Rechazada</li>
-        <li>⚠️ Parcial</li>
-        </ul>
-        </div>
-        """, unsafe_allow_html=True)
     
-    # Implicaciones económicas
-    st.markdown('<div class="subsection-header">💰 Implicaciones Económicas</div>', unsafe_allow_html=True)
     
-    st.markdown("""
-    <div class="conclusion-box">
-    <h4>💵 Impacto Económico Proyectado:</h4>
-    
-    <div style="display: flex; justify-content: space-between; margin: 1rem 0;">
-        <div style="text-align: center;">
-            <h3 style="color: #2ca02c;">$[Valor]</h3>
-            <p>Ganancia Anual Estimada</p>
-        </div>
-        <div style="text-align: center;">
-            <h3 style="color: #1f77b4;">[X]%</h3>
-            <p>ROI Proyectado</p>
-        </div>
-        <div style="text-align: center;">
-            <h3 style="color: #ff7f0e;">[X] meses</h3>
-            <p>Tiempo de Recuperación</p>
-        </div>
-    </div>
-    
-    <h4>📊 Análisis de Sensibilidad:</h4>
-    <ul>
-    <li><strong>Escenario Optimista:</strong> $[valor] (+[X]% vs base)</li>
-    <li><strong>Escenario Base:</strong> $[valor]</li>
-    <li><strong>Escenario Pesimista:</strong> $[valor] (-[X]% vs base)</li>
-    </ul>
-    
-    <h4>💡 Factores de Riesgo Económico:</h4>
-    <ul>
-    <li>[Factor de riesgo 1 y su impacto]</li>
-    <li>[Factor de riesgo 2 y su impacto]</li>
-    <li>[Factor de riesgo 3 y su impacto]</li>
-    </ul>
-    </div>
-    """, unsafe_allow_html=True)
     
     # Lecciones aprendidas
     st.markdown('<div class="subsection-header">🎓 Lecciones Aprendidas</div>', unsafe_allow_html=True)
@@ -2937,10 +2956,9 @@ def show_conclusions():
         <div class="highlight-box">
         <h4>✅ Lo que Funcionó Bien:</h4>
         <ul>
-        <li>[Aspecto exitoso 1 de tu proyecto]</li>
-        <li>[Aspecto exitoso 2 de tu proyecto]</li>
-        <li>[Aspecto exitoso 3 de tu proyecto]</li>
-        <li>[Técnica o metodología que dio buenos resultados]</li>
+        <li>Generación de prototipo app interactiva cercana a posible app en producción.</li>
+        <li>Extracción de datos reales y utilización de los mismos para generar modelos.</li>
+        <li>Exploración y transformación de datos para entender patrones que se relacionen con la calidad de un vino.</li>
         </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -2950,10 +2968,9 @@ def show_conclusions():
         <div class="highlight-box">
         <h4>⚠️ Desafíos Encontrados:</h4>
         <ul>
-        <li>[Desafío 1 y cómo lo resolviste]</li>
-        <li>[Desafío 2 y cómo lo resolviste]</li>
-        <li>[Limitación técnica encontrada]</li>
-        <li>[Problema de datos que enfrentaste]</li>
+        <li>Falta de etiqueta de datos ('like / dislike') para plantear ejercicio de ML supervisado - Generación de usuario sintético.</li>
+        <li>Tipos de datos complejos y gran dimensionalidad - ETL + Feature selection (SFS, SelectKBest, Feature Importance).</li>
+        <li>Data Leakage de usuario sintético - No utilizar métricas globales como input de lógicas decisión.</li>
         </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -2961,129 +2978,49 @@ def show_conclusions():
     # Áreas de mejora
     st.markdown('<div class="subsection-header">🔧 Áreas de Mejora y Trabajo Futuro</div>', unsafe_allow_html=True)
     
-    improvements_tabs = st.tabs(["🔮 Mejoras Técnicas", "📊 Datos y Features", "⚡ Implementación", "🌐 Escalabilidad"])
-    
+    improvements_tabs = st.tabs(["🚀 Mejoras Prioritarias", "📊 Expansión y Datos"])
+
     with improvements_tabs[0]:
         st.markdown("""
-        #### 🛠️ Mejoras Técnicas Propuestas:
+        #### 🎯 Mejoras Técnicas Principales:
         
-        **Algoritmos:**
-        - [Algoritmo avanzado que podrías probar]
-        - [Técnica de ensemble que podrías implementar]
-        - [Método de deep learning aplicable]
+        **Machine Learning y Personalización:**
+        - **Implementación de Neural Networks** para detectar patrones complejos de decisión de los usuarios
+        - **Utilización de datos reales** de usuario (no sintéticos) para entrenar modelos de ML
+        - **Sistema de feedback inteligente**: guardado y utilización de feedback para reentrenar modelos y generar recomendaciones personalizadas
+        - **Sección "Descubrí Nuevos Vinos"** basada en el perfil y preferencias del usuario
         
-        **Optimización:**
-        - [Técnica de optimización de hiperparámetros más avanzada]
-        - [Método de selección de features más sofisticado]
-        - [Técnica de validación más robusta]
+        **Experiencia de Usuario:**
+        - **Mejora de performance y diseño** de la aplicación para mejor UX
+        - **Sistema de notificaciones** para recordar al usuario dejar feedback
+        - **Perfil completo de vinos** con características detalladas de cada producto
+        - **Creador de comidas personalizado**: permitir al usuario crear sus propias comidas incorporando ingredientes de las recetas
+        
+        **Integración y Disponibilidad:**
+        - **Dataset de vinos cotidianos** para asegurar disponibilidad de productos recomendados
+        - **Referencias de compra**: incorporar enlaces a sitios donde adquirir los vinos recomendados
+        - **Modularización del código** analítico para mejor mantenimiento
         """)
-    
+
     with improvements_tabs[1]:
         st.markdown("""
-        #### 📈 Datos y Feature Engineering:
+        #### 📈 Expansión de Funcionalidades:
         
-        **Nuevas Fuentes de Datos:**
-        - [Fuente de datos adicional 1]
-        - [Fuente de datos adicional 2]
-        - [Datos externos que podrían enriquecer el análisis]
+        **Fuentes de Datos:**
+        - Integración con APIs de bodegas y distribuidores para precios actualizados
+        - Datos de calificaciones de usuarios de otras plataformas especializadas
+        - Información estacional y de disponibilidad regional
         
-        **Feature Engineering Avanzado:**
-        - [Feature compleja que podrías crear]
-        - [Transformación no lineal a explorar]
-        - [Interacciones entre variables a investigar]
+        **Funcionalidades Avanzadas:**
+        - Sistema de recomendación colaborativa entre usuarios
+        - Integración con calendario para sugerir vinos según ocasiones especiales
+        - Análisis de tendencias de consumo personal a lo largo del tiempo
+        
+        **Escalabilidad:**
+        - Pipeline de MLOps para reentrenamiento automático de modelos
+        - Sistema de A/B testing para optimizar recomendaciones
+        - Arquitectura cloud para manejar mayor volumen de usuarios
         """)
-    
-    with improvements_tabs[2]:
-        st.markdown("""
-        #### 🚀 Implementación y Deployment:
-        
-        **Infraestructura:**
-        - [Plataforma de deployment sugerida]
-        - [Sistema de monitoreo a implementar]
-        - [Pipeline de MLOps a desarrollar]
-        
-        **Automatización:**
-        - [Proceso a automatizar 1]
-        - [Proceso a automatizar 2]
-        - [Sistema de reentrenamiento automático]
-        """)
-    
-    with improvements_tabs[3]:
-        st.markdown("""
-        #### 📈 Escalabilidad y Expansión:
-        
-        **Escalabilidad Técnica:**
-        - [Mejora de performance para más datos]
-        - [Optimización para tiempo real]
-        - [Distribución de procesamiento]
-        
-        **Expansión de Negocio:**
-        - [Aplicación a otros segmentos]
-        - [Extensión a otros mercados]
-        - [Integración con otros sistemas]
-        """)
-    
-    # Impacto y valor agregado
-    st.markdown('<div class="subsection-header">🌟 Impacto y Valor Agregado</div>', unsafe_allow_html=True)
-    
-    impact_metrics = st.columns(4)
-    
-    with impact_metrics[0]:
-        st.metric(
-            "Eficiencia Ganada", 
-            "[X]%", 
-            "vs proceso manual"
-        )
-    
-    with impact_metrics[1]:
-        st.metric(
-            "Reducción de Errores", 
-            "[X]%", 
-            "vs método anterior"
-        )
-    
-    with impact_metrics[2]:
-        st.metric(
-            "Tiempo Ahorrado", 
-            "[X] horas/semana", 
-            "por automatización"
-        )
-    
-    with impact_metrics[3]:
-        st.metric(
-            "Satisfacción Usuario", 
-            "[X]/10", 
-            "score de adopción"
-        )
-    
-    # Recomendaciones finales
-    st.markdown('<div class="subsection-header">💡 Recomendaciones Finales</div>', unsafe_allow_html=True)
-    
-    recommendations_col1, recommendations_col2 = st.columns(2)
-    
-    with recommendations_col1:
-        st.markdown("""
-        <div class="conclusion-box">
-        <h4>🎯 Recomendaciones Inmediatas (0-3 meses):</h4>
-        <ol>
-        <li>[Recomendación inmediata 1]</li>
-        <li>[Recomendación inmediata 2]</li>
-        <li>[Recomendación inmediata 3]</li>
-        </ol>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with recommendations_col2:
-        st.markdown("""
-        <div class="conclusion-box">
-        <h4>🚀 Recomendaciones a Mediano Plazo (3-12 meses):</h4>
-        <ol>
-        <li>[Recomendación mediano plazo 1]</li>
-        <li>[Recomendación mediano plazo 2]</li>
-        <li>[Recomendación mediano plazo 3]</li>
-        </ol>
-        </div>
-        """, unsafe_allow_html=True)
     
     # Reflexión personal
     st.markdown('<div class="subsection-header">🤔 Reflexión Personal del Proyecto</div>', unsafe_allow_html=True)
@@ -3091,13 +3028,80 @@ def show_conclusions():
     st.markdown("""
     <div class="highlight-box">
     <h4>📝 Aprendizajes Personales:</h4>
-    <p>[Escribe aquí tus reflexiones personales sobre el proyecto, qué aprendiste, qué te resultó más desafiante, qué te gustó más, etc.]</p>
+    
+    <p><strong>Magnitud del Proyecto:</strong></p>
+    <ul>
+    <li>+150 horas de trabajo dedicadas a lo largo de 5-6 meses</li>
+    <li>El proyecto de ML y datos más grande que desarrollé hasta la fecha</li>
+    <li>Primera experiencia real con la complejidad de un proyecto completo de Machine Learning</li>
+    </ul>
+    
+    <p><strong>Extracción y Exploración de Datos:</strong></p>
+    <ul>
+    <li>Primera experiencia con <strong>web scraping</strong> para obtener datos reales</li>
+    <li>Aprendí metodologías sistemáticas para exploración de datos</li>
+    <li>Desarrollé habilidades sólidas en <strong>ETL</strong> para transformar datos crudos en datasets utilizables</li>
+    </ul>
+    
+    <p><strong>Programación y Arquitectura:</strong></p>
+    <ul>
+    <li>Creé una arquitectura de proyecto <strong>mantenible y modularizada</strong></li>
+    <li>Mejoré significativamente mis habilidades de programación</li>
+    <li>Aprendí a estructurar código para proyectos de gran escala</li>
+    </ul>
+    
+    <p><strong>Modelado y Lógica de Negocio:</strong></p>
+    <ul>
+    <li>Múltiples iteraciones y aprendizajes en el desarrollo de modelos</li>
+    <li>Generé <strong>lógica de usuario sintético</strong> con reglas probabilísticas complejas</li>
+    <li>Balanceé aleatoriedad controlada con patrones predecibles para entrenamiento</li>
+    </ul>
+    
+    <p><strong>Implementación y Valor Real:</strong></p>
+    <ul>
+    <li>Desarrollé una <strong>app interactiva y visual</strong> completamente funcional</li>
+    <li>Implementé <strong>cálculo económico</strong> como métrica principal para selección de modelos</li>
+    <li>Experimenté cómo ML puede resolver problemas reales y aportar valor tangible</li>
+    </ul>
     
     <h4>🎯 Aplicación en el Futuro:</h4>
-    <p>[Describe cómo planeas aplicar estos conocimientos en tu carrera profesional o en futuros proyectos]</p>
+    
+    <p><strong>Desarrollo Continuo:</strong></p>
+    <ul>
+    <li>Continuar desarrollando proyectos personales de Data Science</li>
+    <li>Seguir profundizando conocimientos en Machine Learning</li>
+    <li>Ya estoy aplicando conocimientos de programación y lógica en mi trabajo actual</li>
+    </ul>
+    
+    <p><strong>Impacto Profesional:</strong></p>
+    <ul>
+    <li>Puedo participar activamente en discusiones con equipos de <strong>analítica predictiva</strong></li>
+    <li>Entiendo las complejidades técnicas y de negocio involucradas</li>
+    <li>Objetivo futuro: <strong>liderar discusiones</strong> y aportar más activamente en ML</li>
+    </ul>
     
     <h4>🙏 Agradecimientos:</h4>
-    <p>[Agradecimientos a tutores, compañeros, fuentes de datos, etc.]</p>
+    
+    <p><strong>Equipo Académico:</strong></p>
+    <ul>
+    <li><strong>Ignacio Urteaga, Anahí Romo Santagostino, Julio Paredes</strong> - Por su guía y enseñanza</li>
+    </ul>
+    
+    <p><strong>Compañeros y Colaboradores:</strong></p>
+    <ul>
+    <li><strong>Maricel</strong> - Gran soporte inicial y compañera durante toda la cursada</li>
+    <li>Su apoyo fue fundamental, especialmente considerando sus mayores responsabilidades</li>
+    </ul>
+    
+    <p><strong>Recursos y Perseverancia:</strong></p>
+    <ul>
+    <li><strong>Vivino</strong> - Por proporcionar los datos que hicieron posible este proyecto</li>
+    <li><strong>A mis seres queridos</strong> - Por entender mis ausencias y apoyar mi crecimiento profesional durante este período intensivo</li>
+    <li><strong>A mí mismo</strong> - Por nunca aflojar, incluso en momentos donde avanzar fue lento y complejo</li>
+    </ul>
+    
+    <p><em><strong>Reflexión Final:</strong> Fue un camino muy recompensante y estoy super satisfecho del gran desafío superado. ¡Listo para lo que viene!</em></p>
+    
     </div>
     """, unsafe_allow_html=True)
 
